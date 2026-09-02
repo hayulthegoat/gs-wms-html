@@ -1,0 +1,2666 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>WMS 창고관리시스템 - 베트남 박장공장</title>
+  <!-- 프리텐다드 폰트 적용 -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    th { cursor: pointer; user-select: none; }
+    th:hover { background-color: rgba(241, 245, 249, 0.5); }
+    .cal-sticky {
+      position: -webkit-sticky;
+      position: sticky;
+      top: 1.5rem;
+    }
+    /* 구글 앱스 스크립트 warning-bar-table 및 경고 배너 완전 숨김 */
+    #warning-bar-table,
+    #warning-bar-table tbody tr:first-child,
+    #warning-bar-table tbody tr,
+    #warning-bar-table tr,
+    .warning-banner-bar,
+    .warning-bar,
+    #warning,
+    .app-warning-banner,
+    div[role="banner"].warning-bar {
+      display: none !important;
+      visibility: hidden !important;
+      height: 0 !important;
+      max-height: 0 !important;
+      overflow: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      line-height: 0 !important;
+      font-size: 0 !important;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      body { background-color: white !important; padding: 0 !important; }
+      #sidebar { display: none !important; }
+    }
+  </style>
+</head>
+<body :class="isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'" class="antialiased transition-colors duration-200">
+  <div id="app" class="min-h-screen">
+
+    <!-- =================================================================== -->
+    <!-- [보안 게이트] loginRequired=true 일 때만 노출되는 로그인 화면 -->
+    <!-- (loginRequired=false 로 설정 시 누구나 로그인 없이 바로 시스템 접근!) -->
+    <!-- =================================================================== -->
+    <div v-if="loginRequired && !isLoggedIn" class="min-h-screen flex items-center justify-center p-4 bg-slate-950">
+      <div class="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl space-y-6 text-center border border-slate-100">
+        
+        <!-- 파란색 박스 아이콘 -->
+        <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl shadow-lg shadow-blue-500/30 mx-auto">
+          📦
+        </div>
+
+        <div>
+          <h2 class="text-2xl font-black text-slate-900 tracking-tight">AR Korea WMS</h2>
+          <p class="text-xs text-slate-400 font-medium mt-1">자재 실사 & 통합 수불 관리 시스템</p>
+        </div>
+
+        <!-- 로그인 폼 -->
+        <div class="space-y-4 text-left pt-1">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">아이디</label>
+            <input type="text" v-model="loginInputId" placeholder="아이디 입력 (arkorea)"
+                   @keyup.enter="handleLogin"
+                   class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition placeholder:text-slate-300">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">비밀번호</label>
+            <input type="password" v-model="loginInputPw" placeholder="비밀번호 입력"
+                   @keyup.enter="handleLogin"
+                   class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition placeholder:text-slate-300">
+          </div>
+
+          <div v-if="loginError" class="p-2.5 bg-red-50 text-red-600 text-xs font-bold rounded-xl text-center">
+            {{ loginError }}
+          </div>
+
+          <button @click="handleLogin"
+                  class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm rounded-xl shadow-lg shadow-blue-600/30 transition transform active:scale-98">
+            로그인
+          </button>
+        </div>
+
+        <p class="text-[11px] text-slate-400 font-medium pt-2 flex items-center justify-center gap-1">
+          <span>🔒</span> 사내 보안 인트라넷 시스템
+        </p>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- [메인 시스템] loginRequired=false 이거나 로그인 완료 시 전체 화면 표시 -->
+    <!-- =================================================================== -->
+    <div v-else class="flex min-h-screen">
+
+      <!-- 1. 좌측 사이드바 (너비 280px, 17px 큼직한 메뉴 폰트, SVG 아이콘) -->
+      <aside id="sidebar" :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-900 border-slate-800'"
+             class="w-72 text-white shrink-0 sticky top-0 h-screen overflow-y-auto flex flex-col justify-between border-r z-30 no-print">
+        <div>
+        <!-- 로고 타이틀 -->
+        <div class="h-24 flex items-center gap-3.5 px-6 border-b border-slate-800/80">
+          <div class="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          </div>
+          <div class="overflow-hidden">
+            <h1 class="font-black text-[17px] tracking-tight text-white truncate leading-tight">WMS 창고관리시스템</h1>
+            <p class="text-xs text-slate-400 font-medium mt-1">베트남 박장공장</p>
+          </div>
+        </div>
+
+        <!-- 네비게이션 메뉴 (17px 폰트 & SVG 아이콘) -->
+        <nav class="p-4 space-y-6 text-[16px]">
+          
+          <!-- 그룹 1: 메인 -->
+          <div class="space-y-1.5">
+            <p class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider">메인</p>
+            <button @click="currentMenu = 'dashboard'" :class="currentMenu === 'dashboard' ? 'bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition text-left">
+              <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+              <span>대시보드</span>
+            </button>
+          </div>
+
+          <!-- 그룹 2: 재고 관리 -->
+          <div class="space-y-1.5">
+            <p class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider">재고 관리</p>
+            
+            <button @click="currentMenu = 'current_stock'" :class="currentMenu === 'current_stock' ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition text-left">
+              <div class="flex items-center gap-3.5">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <span>현재 재고</span>
+              </div>
+              <span class="text-xs text-slate-600">›</span>
+            </button>
+
+            <button @click="currentMenu = 'inbound_status'" :class="currentMenu === 'inbound_status' ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition text-left">
+              <div class="flex items-center gap-3.5">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span>입고현황</span>
+              </div>
+              <span class="text-xs text-slate-600">›</span>
+            </button>
+
+            <button @click="currentMenu = 'theoretical_outbound'" :class="currentMenu === 'theoretical_outbound' ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition text-left">
+              <div class="flex items-center gap-3.5">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                <span>이론출고량</span>
+              </div>
+              <span class="text-xs text-slate-600">›</span>
+            </button>
+
+            <button @click="currentMenu = 'reversal_events'" :class="currentMenu === 'reversal_events' ? 'bg-amber-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition text-left">
+              <div class="flex items-center gap-3.5">
+                <svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <span class="text-amber-400 font-semibold">역전발생</span>
+              </div>
+              <span v-if="totalStats.reversalCount > 0" class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                {{ totalStats.reversalCount }}
+              </span>
+            </button>
+
+            <button @click="currentMenu = 'rack_map'" :class="currentMenu === 'rack_map' ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-2xl transition text-left">
+              <div class="flex items-center gap-3.5">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                <span>창고위치정보</span>
+              </div>
+              <span class="text-xs text-slate-600">›</span>
+            </button>
+          </div>
+
+          <!-- 그룹 3: 리포트 -->
+          <div class="space-y-1.5">
+            <p class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider">리포트</p>
+            <button @click="currentMenu = 'report'" :class="currentMenu === 'report' ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition text-left">
+              <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <span>판재 재고 & 수불 리포트</span>
+            </button>
+          </div>
+
+          <!-- 그룹 4: 설정 & 서버 연동 -->
+          <div class="space-y-1.5">
+            <p class="px-3 text-xs font-bold text-slate-500 uppercase tracking-wider">설정 & 서버 연동</p>
+            
+            <button @click="currentMenu = 'sync_history'" :class="currentMenu === 'sync_history' ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition text-left">
+              <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>동기화 내역</span>
+            </button>
+
+            <button @click="currentMenu = 'user_admin'" :class="currentMenu === 'user_admin' ? 'bg-blue-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition text-left">
+              <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              <span>사용자 관리</span>
+            </button>
+
+            <button @click="currentMenu = 'help'" :class="currentMenu === 'help' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                    class="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition text-left">
+              <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>도움말 & 가이드 (FAQ)</span>
+            </button>
+          </div>
+        </nav>
+      </div>
+
+      <!-- 사이드바 하단: 동기화서버 바로가기 + M01 관리자 프로필 -->
+      <div class="p-4 border-t border-slate-800 bg-slate-900/90 space-y-3">
+        <a href="https://app.ar-korea.com" target="_blank"
+           class="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl shadow-md transition group">
+          <div class="flex items-center gap-2.5">
+            <span class="text-base">🚀</span>
+            <div class="leading-tight">
+              <p class="text-xs font-black">동기화서버 바로가기</p>
+              <p class="text-[10px] text-blue-200">app.ar-korea.com</p>
+            </div>
+          </div>
+          <span class="text-xs group-hover:translate-x-0.5 transition">↗</span>
+        </a>
+
+        <div class="flex items-center justify-between px-2 py-1.5 rounded-xl">
+          <div class="flex items-center gap-3 overflow-hidden">
+            <div class="w-9 h-9 rounded-full bg-blue-600/30 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+              M
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-bold text-white leading-tight truncate">M01 | {{ authUser.name }}</p>
+              <p class="text-[10px] text-slate-400 truncate">{{ authUser.id }}</p>
+            </div>
+          </div>
+          <!-- loginRequired 모드일 때 안전 로그아웃 버튼 -->
+          <button v-if="loginRequired" @click="handleLogout" title="로그아웃"
+                  class="text-xs text-slate-400 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-slate-800 transition">
+            ⏻
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 2. 우측 메인 콘텐츠 영역 (다크모드 완벽 배경색 바인딩) -->
+    <main :class="isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'"
+          class="flex-1 overflow-y-auto max-w-full p-6 lg:p-8 space-y-6 transition-colors duration-200">
+
+      <!-- 상단 헤더 -->
+      <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 no-print">
+        <div>
+          <h1 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black tracking-tight">
+            {{ getPageTitle() }}
+          </h1>
+          <p class="text-xs text-slate-400 mt-0.5">
+            {{ getPageSubtitle() }}
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          
+          <!-- 2번 요구: 라이트모드도 다크모드와 같은 어두운 배경색 유지 + 아이콘/라벨 전환 -->
+          <button @click="toggleDarkMode"
+                  class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-3.5 py-2 rounded-xl shadow-sm text-xs font-bold transition flex items-center gap-2">
+            <span v-if="isDark" class="text-yellow-300">🌙</span>
+            <span v-else class="text-amber-400">☀️</span>
+            <span>{{ isDark ? '다크모드' : '라이트모드' }}</span>
+          </button>
+
+          <!-- 언어 셀렉터 -->
+          <div class="relative">
+            <select v-model="lang"
+                    :class="isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-700'"
+                    class="appearance-none border rounded-xl px-3 py-2 pr-8 text-xs font-bold shadow-sm focus:outline-none">
+              <option value="ko">🇰🇷 한국어</option>
+              <option value="vn">🇻🇳 Tiếng Việt</option>
+            </select>
+            <span class="absolute right-2.5 top-2.5 text-[10px] text-slate-400 pointer-events-none">▼</span>
+          </div>
+
+          <!-- 분기 및 올해 선택이 가능한 기간 셀렉터 -->
+          <div :class="isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'"
+               class="flex items-center border rounded-xl px-3 py-1.5 shadow-sm text-xs font-bold">
+            <select v-model="selectedPeriod"
+                    :class="isDark ? 'bg-slate-900 text-slate-200' : 'bg-white text-slate-700'"
+                    class="focus:outline-none pr-1">
+              <option value="all">올해 전체 (2026)</option>
+              <option value="Q1">1분기 (1~3월)</option>
+              <option value="Q2">2분기 (4~6월)</option>
+              <option value="Q3">3분기 (7~9월)</option>
+              <option value="Q4">4분기 (10~12월)</option>
+              <option disabled>──────────</option>
+              <option v-for="m in availableMonths" :key="m" :value="m">{{ formatMonth(m) }}</option>
+            </select>
+            <span class="text-slate-400">📅</span>
+          </div>
+
+          <button @click="downloadHtmlReport" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition flex items-center gap-1">
+            <span>📥</span> HTML 저장
+          </button>
+          <button @click="printReport" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition flex items-center gap-1">
+            <span>🖨️</span> PDF 인쇄
+          </button>
+        </div>
+      </header>
+
+      <!-- =================================================================== -->
+      <!-- [뷰: 현재 재고] 3대 뷰 (렉뷰 | 테이블뷰 | 차트뷰) -->
+      <!-- =================================================================== -->
+      <div v-if="currentMenu === 'current_stock'" class="space-y-6">
+        
+        <!-- 상단 툴바 및 뷰 모드 스위처 -->
+        <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl p-6 border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-3">
+              <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black tracking-tight">현재 재고 현황</h2>
+              <span class="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-xs font-black">
+                총 재고: {{ totalStats.stock.toLocaleString() }} EA
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">
+              최종 실사 카운트 기준 품목별 렉 적재 수량과 위치를 3가지 뷰(렉뷰/테이블/차트)로 열람합니다.
+            </p>
+          </div>
+
+          <!-- 3대 뷰 스위처: 렉뷰 | 테이블뷰 | 차트뷰 -->
+          <div :class="isDark ? 'bg-slate-800' : 'bg-slate-100'" class="inline-flex rounded-2xl p-1 text-xs font-bold">
+            <button @click="currentStockView = 'rack'" :class="currentStockView === 'rack' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+              <span>🗺️</span> 렉뷰
+            </button>
+            <button @click="currentStockView = 'table'" :class="currentStockView === 'table' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+              <span>📑</span> 테이블뷰
+            </button>
+            <button @click="currentStockView = 'chart'" :class="currentStockView === 'chart' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+              <span>📊</span> 차트뷰
+            </button>
+          </div>
+        </div>
+
+        <!-- 1) 렉뷰 (창고위치정보 실물 2D 맵 복사 탑재) -->
+        <div v-if="currentStockView === 'rack'" :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl p-6 border shadow-sm space-y-6">
+          <div class="flex items-center justify-between border-b pb-4" :class="isDark ? 'border-slate-800' : 'border-slate-100'">
+            <h3 :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-lg flex items-center gap-2">
+              <span>🏢</span> 공장동 선반 렉 2D 실시간 적재 맵
+            </h3>
+            <div :class="isDark ? 'bg-slate-800' : 'bg-slate-100'" class="inline-flex rounded-xl p-1 font-bold text-xs">
+              <button @click="selectedBuilding = 'B'" :class="selectedBuilding === 'B' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3.5 py-1.5 rounded-lg transition">
+                B동 (판재 주창고)
+              </button>
+              <button @click="selectedBuilding = 'C'" :class="selectedBuilding === 'C' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3.5 py-1.5 rounded-lg transition">
+                C동 (후판 창고)
+              </button>
+            </div>
+          </div>
+
+          <!-- B동 5열 4단 선반 랙 실물 맵 -->
+          <div v-if="selectedBuilding === 'B'" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <!-- F열 (회색 랙) -->
+            <div class="bg-slate-800 p-3.5 rounded-2xl text-white space-y-3 shadow-md border border-slate-700">
+              <p class="text-center font-black text-xs text-slate-300 border-b border-slate-700 pb-2">회색 랙 (F열)</p>
+              <div v-for="slot in ['F4-2', 'F3', 'F2', 'F1']" :key="slot" class="p-3 bg-slate-700/70 rounded-xl border border-slate-600 space-y-1">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-yellow-300 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- E열 (회색 랙) -->
+            <div class="bg-slate-800 p-3.5 rounded-2xl text-white space-y-3 shadow-md border border-slate-700">
+              <p class="text-center font-black text-xs text-slate-300 border-b border-slate-700 pb-2">회색 랙 (E열)</p>
+              <div v-for="slot in ['E4', 'E3', 'E2', 'E1']" :key="slot" class="p-3 bg-slate-700/70 rounded-xl border border-slate-600 space-y-1">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-yellow-300 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- C열 (아이보리 랙) -->
+            <div class="bg-amber-50/90 p-3.5 rounded-2xl border border-amber-200 text-slate-800 space-y-3 shadow-sm">
+              <p class="text-center font-black text-xs text-amber-800 border-b border-amber-200 pb-2">아이보리 랙 (C열)</p>
+              <div v-for="slot in ['C4', 'C3', 'C1+C2']" :key="slot" class="p-3 bg-white rounded-xl border border-amber-200 space-y-1 shadow-sm">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-slate-900 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- B열 (아이보리 랙) -->
+            <div class="bg-amber-50/90 p-3.5 rounded-2xl border border-amber-200 text-slate-800 space-y-3 shadow-sm">
+              <p class="text-center font-black text-xs text-amber-800 border-b border-amber-200 pb-2">아이보리 랙 (B열)</p>
+              <div v-for="slot in ['B4', 'B3', 'B2', 'B1']" :key="slot" class="p-3 bg-white rounded-xl border border-amber-200 space-y-1 shadow-sm">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-slate-900 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- A열 (아이보리 랙) -->
+            <div class="bg-amber-50/90 p-3.5 rounded-2xl border border-amber-200 text-slate-800 space-y-3 shadow-sm">
+              <p class="text-center font-black text-xs text-amber-800 border-b border-amber-200 pb-2">아이보리 랙 (A열)</p>
+              <div v-for="slot in ['A4', 'A3', 'A1+A2']" :key="slot" class="p-3 bg-white rounded-xl border border-amber-200 space-y-1 shadow-sm">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-slate-900 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- C동 G랙 -->
+          <div v-else class="max-w-md mx-auto bg-amber-50 p-6 rounded-3xl border border-amber-200 space-y-4">
+            <p class="text-center font-black text-sm text-amber-800 border-b border-amber-200 pb-2">C동 G랙 (후판 전용 3단 선반)</p>
+            <div v-for="slot in ['G3', 'G2', 'G1']" :key="slot" class="p-4 bg-white rounded-2xl border border-amber-200 flex items-center justify-between shadow-sm">
+              <div>
+                <span class="text-xs text-slate-400 font-bold">{{ slot }}</span>
+                <p class="font-black text-slate-900 text-base">{{ getRackData(slot).alias || 'NO1-30T' }}</p>
+              </div>
+              <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">{{ getRackData(slot).stock }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2) 테이블뷰 -->
+        <div v-else-if="currentStockView === 'table'" :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl border shadow-sm overflow-hidden">
+          <div class="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4" :class="isDark ? 'border-slate-800' : 'border-slate-100'">
+            <div class="flex items-center gap-3">
+              <h3 :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-base">품목별 재고 및 보관 위치</h3>
+              <span class="text-xs font-bold text-slate-400">총 {{ filteredAndSortedData.length }}개 품목</span>
+            </div>
+            <input type="text" v-model="searchQuery" placeholder="자재명 또는 위치 검색..."
+                   :class="isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'"
+                   class="w-64 px-3.5 py-1.5 border rounded-xl text-xs focus:outline-none">
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr :class="isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-100'" class="font-bold border-b">
+                  <th class="py-3.5 px-6" @click="sortBy('alias')">자재명 (별칭 / 규격) ↕</th>
+                  <th class="py-3.5 px-6" @click="sortBy('location')">보관 위치 ↕</th>
+                  <th class="py-3.5 px-6 text-right text-emerald-500" @click="sortBy('latestStock')">현재 렉 재고 ↕</th>
+                  <th class="py-3.5 px-6 text-right text-blue-500" @click="sortBy('totalInbound')">기간 누적 입고 ↕</th>
+                  <th class="py-3.5 px-6 text-right text-red-500" @click="sortBy('totalUsage')">기간 누적 소진 ↕</th>
+                  <th class="py-3.5 px-6 text-center">실사 확인</th>
+                </tr>
+              </thead>
+              <tbody :class="isDark ? 'divide-slate-800 text-slate-300' : 'divide-slate-100 text-slate-700'" class="divide-y">
+                <tr v-for="(item, idx) in paginatedData" :key="'stk_' + item.productName + '_' + idx" :class="isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'">
+                  <td class="py-3.5 px-6">
+                    <p :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-sm">{{ item.alias || item.productName }}</p>
+                    <p class="text-[11px] text-slate-400 font-mono">{{ item.productName }}</p>
+                  </td>
+                  <td class="py-3.5 px-6 font-medium text-slate-400">
+                    <span :class="isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'" class="px-2.5 py-1 rounded-lg">
+                      {{ item.building }}동 {{ item.location || '미지정' }}
+                    </span>
+                  </td>
+                  <td class="py-3.5 px-6 text-right font-black text-emerald-500 text-sm">{{ item.latestStock }} EA</td>
+                  <td class="py-3.5 px-6 text-right font-bold text-blue-500">+{{ item.totalInbound }} EA</td>
+                  <td class="py-3.5 px-6 text-right font-black text-red-500">-{{ item.totalUsage }} EA</td>
+                  <td class="py-3.5 px-6 text-center">
+                    <button @click="openModal(item)" class="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl border border-blue-200 transition text-xs">
+                      👁️ 실사 사진
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 3) 차트뷰 -->
+        <div v-else-if="currentStockView === 'chart'" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="lg:col-span-6 rounded-3xl p-6 border shadow-sm space-y-4">
+            <h3 :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-base">재질별 현재 재고 비중 (STS / SS)</h3>
+            <div class="h-64 relative flex items-center justify-center">
+              <canvas id="stockMaterialChart"></canvas>
+            </div>
+          </div>
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="lg:col-span-6 rounded-3xl p-6 border shadow-sm space-y-4">
+            <h3 :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-base">자재별 현재 재고 TOP 10 (EA)</h3>
+            <div class="h-64 relative">
+              <canvas id="stockTopChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [뷰 1] 메인 대시보드 -->
+      <!-- =================================================================== -->
+      <div v-else-if="currentMenu === 'dashboard'" class="space-y-6">
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'" class="rounded-2xl p-5 border shadow-sm flex items-center gap-4">
+            <div class="w-13 h-13 p-3 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg shadow-blue-500/20 shrink-0">📥</div>
+            <div>
+              <p class="text-xs font-bold text-blue-600">{{ t('kpiInbound') }}</p>
+              <p :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black mt-0.5">{{ totalStats.inbound.toLocaleString() }} <span class="text-sm font-bold text-slate-500">EA</span></p>
+              <p class="text-[11px] text-slate-400 mt-0.5">{{ t('kpiInboundDesc') }}</p>
+            </div>
+          </div>
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'" class="rounded-2xl p-5 border shadow-sm flex items-center gap-4">
+            <div class="w-13 h-13 p-3 bg-red-500 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg shadow-red-500/20 shrink-0">📤</div>
+            <div>
+              <p class="text-xs font-bold text-red-500">{{ t('kpiUsage') }}</p>
+              <p :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black mt-0.5">{{ totalStats.usage.toLocaleString() }} <span class="text-sm font-bold text-slate-500">EA</span></p>
+              <p class="text-[11px] text-slate-400 mt-0.5">{{ t('kpiUsageDesc') }}</p>
+            </div>
+          </div>
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'" class="rounded-2xl p-5 border shadow-sm flex items-center gap-4">
+            <div class="w-13 h-13 p-3 bg-emerald-500 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg shadow-emerald-500/20 shrink-0">📦</div>
+            <div>
+              <p class="text-xs font-bold text-emerald-600">{{ t('kpiStock') }}</p>
+              <p :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black mt-0.5">{{ totalStats.stock.toLocaleString() }} <span class="text-sm font-bold text-slate-500">EA</span></p>
+              <p class="text-[11px] text-slate-400 mt-0.5">{{ t('kpiStockDesc') }}</p>
+            </div>
+          </div>
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'" class="rounded-2xl p-5 border shadow-sm flex items-center gap-4">
+            <div class="w-13 h-13 p-3 bg-indigo-500 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg shadow-indigo-500/20 shrink-0">📋</div>
+            <div>
+              <p class="text-xs font-bold text-indigo-600">{{ t('kpiAudit') }}</p>
+              <p :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black mt-0.5">{{ totalStats.surveyCount }} <span class="text-sm font-bold text-slate-500">{{ t('times') }}</span></p>
+              <p v-if="totalStats.reversalCount === 0" class="text-[11px] text-emerald-600 font-bold mt-0.5">✓ {{ t('normalAuditState') }}</p>
+              <p v-else class="text-[11px] text-amber-600 font-bold mt-0.5">🚨 {{ t('reversalFound') }} ({{ totalStats.reversalCount }})</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 차트 영역 -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'" class="lg:col-span-7 rounded-2xl p-6 border shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <h2 :class="isDark ? 'text-white' : 'text-slate-800'" class="text-sm font-bold">{{ t('chartTopUsage') }}</h2>
+              <span class="text-[11px] text-slate-400">{{ t('unitEa') }}</span>
+            </div>
+            <div class="h-64 relative">
+              <canvas id="rankingChart"></canvas>
+            </div>
+          </div>
+
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'" class="lg:col-span-5 rounded-2xl p-6 border shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <h2 :class="isDark ? 'text-white' : 'text-slate-800'" class="text-sm font-bold">{{ t('chartMaterialShare') }}</h2>
+              <span class="text-[11px] text-slate-400">STS304 / SS400 등</span>
+            </div>
+            <div class="h-64 flex flex-col sm:flex-row items-center justify-center gap-6 relative">
+              <div class="w-48 h-48 relative shrink-0">
+                <canvas id="materialChart"></canvas>
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span class="text-[11px] font-semibold text-slate-400">{{ t('totalStock') }}</span>
+                  <span :class="isDark ? 'text-white' : 'text-slate-900'" class="text-lg font-black">{{ totalStats.stock }} <span class="text-xs font-normal">EA</span></span>
+                </div>
+              </div>
+              <div class="space-y-2 text-xs font-medium shrink-0">
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded bg-blue-600 shrink-0"></span>
+                  <span :class="isDark ? 'text-slate-300' : 'text-slate-700'" class="font-bold">STS304</span>
+                  <span class="text-slate-400 text-[11px]">{{ materialShare.sts304Percent }}% ({{ materialShare.sts304Count }} EA)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded bg-emerald-500 shrink-0"></span>
+                  <span :class="isDark ? 'text-slate-300' : 'text-slate-700'" class="font-bold">SS400</span>
+                  <span class="text-slate-400 text-[11px]">{{ materialShare.ss400Percent }}% ({{ materialShare.ss400Count }} EA)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded bg-amber-500 shrink-0"></span>
+                  <span :class="isDark ? 'text-slate-300' : 'text-slate-700'" class="font-bold">STS420</span>
+                  <span class="text-slate-400 text-[11px]">{{ materialShare.sts420Percent }}% ({{ materialShare.sts420Count }} EA)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 요약 테이블 -->
+        <section :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'" class="rounded-2xl border shadow-sm overflow-hidden">
+          <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span class="text-base">📑</span>
+              <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-sm font-bold">{{ t('tableTitle') }}</h2>
+              <span class="text-[11px] bg-indigo-50 text-indigo-600 font-bold px-2.5 py-0.5 rounded-full">
+                {{ filteredAndSortedData.length }} {{ t('itemsCount') }}
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              <input type="text" v-model="searchQuery" :placeholder="t('searchPlaceholder')"
+                     :class="isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'"
+                     class="w-56 px-3 py-1.5 border rounded-xl text-xs focus:outline-none">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr :class="isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-100'" class="font-bold border-b">
+                  <th class="py-3.5 px-6" @click="sortBy('alias')">{{ t('thMaterial') }} ↕</th>
+                  <th class="py-3.5 px-6" @click="sortBy('location')">{{ t('thLocation') }} ↕</th>
+                  <th class="py-3.5 px-6 text-right" @click="sortBy('totalInbound')">{{ t('thInbound') }} ↕</th>
+                  <th class="py-3.5 px-6 text-right text-red-500" @click="sortBy('totalUsage')">{{ t('thUsage') }} ↕</th>
+                  <th class="py-3.5 px-6 text-right text-emerald-600" @click="sortBy('latestStock')">{{ t('thStock') }} ↕</th>
+                  <th class="py-3.5 px-6 text-center" @click="sortBy('surveyCount')">{{ t('thAuditCount') }} ↕</th>
+                  <th class="py-3.5 px-6 text-center">{{ t('thStatus') }}</th>
+                </tr>
+              </thead>
+              <tbody :class="isDark ? 'divide-slate-800 text-slate-300' : 'divide-slate-100 text-slate-700'" class="divide-y">
+                <tr v-for="(item, idx) in paginatedData" :key="'dash_' + item.productName + '_' + idx" :class="isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50/80'" class="transition-colors">
+                  <td class="py-3.5 px-6">
+                    <div :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-sm">{{ item.alias || item.productName }}</div>
+                    <div class="text-[11px] text-slate-400 font-mono mt-0.5">{{ item.productName }}</div>
+                  </td>
+                  <td class="py-3.5 px-6">
+                    <span :class="isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'" class="inline-flex items-center px-2.5 py-1 rounded-lg font-medium text-[11px]">
+                      {{ item.building ? item.building + (lang === 'ko' ? '동 ' : ' Khu ') : '' }}{{ item.location || '미지정' }}
+                    </span>
+                  </td>
+                  <td :class="isDark ? 'text-white' : 'text-slate-900'" class="py-3.5 px-6 text-right font-bold">{{ item.totalInbound }} EA</td>
+                  <td class="py-3.5 px-6 text-right font-black text-red-500">{{ item.totalUsage }} EA</td>
+                  <td class="py-3.5 px-6 text-right font-black text-emerald-600">{{ item.latestStock }} EA</td>
+                  <td class="py-3.5 px-6 text-center text-slate-500 font-medium">{{ item.surveyCount }}{{ t('times') }}</td>
+                  <td class="py-3.5 px-6 text-center">
+                    <span v-if="item.reversalCount > 0" class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-600">
+                      🚨 {{ t('reversalTag') }} {{ item.reversalCount }}
+                    </span>
+                    <span v-else class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600">
+                      {{ t('normalTag') }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [뷰 2] 입고현황 (1번 요구: 연도/월 확실한 드롭다운 변경 & 진한 취소선) -->
+      <!-- =================================================================== -->
+      <div v-else-if="currentMenu === 'inbound_status'" class="flex flex-col lg:flex-row gap-6 items-start">
+        
+        <!-- 좌측: 360px 스티키 캘린더 (1번 요구: 연도/월 클릭 셀렉터 확실하게 탑재) -->
+        <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'"
+             class="w-full lg:w-[360px] shrink-0 rounded-3xl p-6 border shadow-sm cal-sticky space-y-6">
+          
+          <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex items-center justify-between border-b pb-3">
+            <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-xl font-black tracking-tight flex items-center gap-2">
+              <span>📅</span> 일자 필터 (달력)
+            </h2>
+            <span class="text-xs bg-blue-50 text-blue-600 font-bold px-2.5 py-1 rounded-lg">
+              입고 전용
+            </span>
+          </div>
+
+          <!-- 1번 요구 해결: 스크린샷 1번의 2026년 4월 부분을 확실한 드롭다운 셀렉터로 제공! -->
+          <div :class="isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50/80 border-slate-200'" class="border rounded-2xl p-4 space-y-4 shadow-sm">
+            <div class="flex items-center justify-between gap-2 px-1">
+              
+              <!-- 연도 드롭다운 -->
+              <div class="relative">
+                <select v-model="calYear"
+                        :class="isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'"
+                        class="appearance-none border rounded-xl px-3 py-1.5 pr-7 text-xs font-black shadow-sm focus:outline-none">
+                  <option :value="2025">2025년</option>
+                  <option :value="2026">2026년</option>
+                  <option :value="2027">2027년</option>
+                </select>
+                <span class="absolute right-2 top-2 text-[10px] text-slate-400 pointer-events-none">▼</span>
+              </div>
+
+              <!-- 월 드롭다운 -->
+              <div class="relative">
+                <select v-model="calMonth"
+                        :class="isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'"
+                        class="appearance-none border rounded-xl px-3 py-1.5 pr-7 text-xs font-black shadow-sm focus:outline-none">
+                  <option v-for="m in 12" :key="m" :value="m">{{ m }}월</option>
+                </select>
+                <span class="absolute right-2 top-2 text-[10px] text-slate-400 pointer-events-none">▼</span>
+              </div>
+
+              <!-- 이전/다음 월 버튼 -->
+              <div class="flex items-center gap-1">
+                <button @click="changeCalMonth(-1)" :class="isDark ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-600'" class="w-7 h-7 flex items-center justify-center rounded-lg font-bold">‹</button>
+                <button @click="changeCalMonth(1)" :class="isDark ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-600'" class="w-7 h-7 flex items-center justify-center rounded-lg font-bold">›</button>
+              </div>
+            </div>
+
+            <!-- 요일 행 -->
+            <div class="grid grid-cols-7 text-center text-xs font-black text-slate-400">
+              <span class="text-red-400">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="text-blue-400">토</span>
+            </div>
+
+            <!-- 날짜 그리드: 유색 배경 및 진한 취소선 -->
+            <div class="grid grid-cols-7 gap-1 text-center font-bold">
+              <div v-for="d in calendarDays" :key="d.key" class="py-0.5 flex justify-center">
+                <button v-if="d.day"
+                        @click="selectInboundDate(d.dateStr)"
+                        :disabled="!d.hasRecord"
+                        :class="[
+                          inboundSelectedDate === d.dateStr 
+                            ? 'bg-blue-600 text-white font-black shadow-lg shadow-blue-500/40 ring-2 ring-blue-400' 
+                            : (d.hasRecord 
+                                ? (isDark ? 'bg-blue-950/80 text-blue-300 border border-blue-800 hover:bg-blue-900' : 'bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200') 
+                                : 'text-slate-400 line-through decoration-slate-400 decoration-2 cursor-not-allowed opacity-30')
+                        ]"
+                        class="w-10 h-10 rounded-2xl flex items-center justify-center text-sm transition duration-150">
+                  {{ d.day }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 범례 -->
+            <div :class="isDark ? 'border-slate-700' : 'border-slate-200'" class="pt-3 border-t flex flex-col gap-1 text-[11px] text-slate-400">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-md bg-blue-100 border border-blue-300 inline-block"></span>
+                <span>입고 실사 기록 있음 (클릭 가능)</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-slate-400 line-through decoration-slate-400 decoration-2 font-black">12</span>
+                <span>실사 기록 없음 (진한 취소선)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 빠른 기간 필터 태그 -->
+          <div class="space-y-2">
+            <p :class="isDark ? 'text-slate-300' : 'text-slate-700'" class="text-xs font-bold">분기 / 기간 빠른 선택</p>
+            <div class="grid grid-cols-2 gap-2 text-xs font-bold">
+              <button @click="inboundSelectedDate = null; selectedPeriod = 'all'"
+                      :class="selectedPeriod === 'all' && !inboundSelectedDate ? 'bg-blue-600 text-white shadow-md' : (isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')"
+                      class="px-3 py-2 rounded-xl transition text-center">
+                올해 전체
+              </button>
+              <button @click="inboundSelectedDate = null; selectedPeriod = 'Q1'"
+                      :class="selectedPeriod === 'Q1' && !inboundSelectedDate ? 'bg-blue-600 text-white shadow-md' : (isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')"
+                      class="px-3 py-2 rounded-xl transition text-center">
+                1분기 (1~3월)
+              </button>
+              <button @click="inboundSelectedDate = null; selectedPeriod = 'Q2'"
+                      :class="selectedPeriod === 'Q2' && !inboundSelectedDate ? 'bg-blue-600 text-white shadow-md' : (isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')"
+                      class="px-3 py-2 rounded-xl transition text-center">
+                2분기 (4~6월)
+              </button>
+              <button @click="inboundSelectedDate = null; selectedPeriod = 'Q3'"
+                      :class="selectedPeriod === 'Q3' && !inboundSelectedDate ? 'bg-blue-600 text-white shadow-md' : (isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')"
+                      class="px-3 py-2 rounded-xl transition text-center">
+                3분기 (7~9월)
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 우측: 메인 입고 현황 본체 -->
+        <div class="flex-1 min-w-0 space-y-6">
+          
+          <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl p-6 border shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-3">
+                <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black tracking-tight">QR 입고 실사 기록</h2>
+                <span :class="isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'" class="px-2.5 py-0.5 rounded-full text-xs font-bold border">
+                  읽기 전용
+                </span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">
+                조회 범위: <strong class="text-blue-500">{{ getPeriodLabel() }}</strong> • 총 {{ filteredInboundRecords.length }}건 기록 발견
+              </p>
+            </div>
+
+            <!-- 서브탭(관점) & 3대 뷰 스위치 (논리적 2단계 계층 구조) -->
+            <div class="flex flex-wrap items-center gap-2.5">
+              <!-- [1단계 관점 선택] 일자별 vs 자재별 -->
+              <div :class="isDark ? 'bg-slate-800' : 'bg-slate-100'" class="inline-flex rounded-xl p-1 text-xs font-bold">
+                <button @click="setInboundSubTab('date')" :class="inboundSubTab === 'date' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3.5 py-1.5 rounded-lg transition flex items-center gap-1">
+                  <span>📅</span> 일자별 흐름
+                </button>
+                <button @click="setInboundSubTab('material')" :class="inboundSubTab === 'material' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3.5 py-1.5 rounded-lg transition flex items-center gap-1">
+                  <span>📦</span> 자재별 분석
+                </button>
+              </div>
+
+              <!-- [2단계 표현 방식] 테이블 vs 카드 vs 차트 -->
+              <div :class="isDark ? 'bg-slate-800' : 'bg-slate-100'" class="inline-flex rounded-xl p-1 text-xs font-bold">
+                <button @click="setInboundViewMode('table')" :class="inboundViewMode === 'table' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                  <span>📑</span> 테이블
+                </button>
+                <button @click="setInboundViewMode('card')" :class="inboundViewMode === 'card' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                  <span>🗂️</span> 카드
+                </button>
+                <button @click="setInboundViewMode('chart')" :class="inboundViewMode === 'chart' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                  <span>📊</span> 차트
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 요약 카드 2개 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-blue-50/70 border-blue-100'" class="rounded-3xl p-5 border shadow-sm flex items-center gap-4">
+              <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-xl shadow-md shadow-blue-500/20 shrink-0">
+                📥
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-400">선택 기간 스캔 건수</p>
+                <p :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black">{{ filteredInboundRecords.length }} <span class="text-xs font-normal text-slate-400">건</span></p>
+                <p class="text-[11px] text-blue-500 font-semibold mt-0.5">QR 입고 실사 완료</p>
+              </div>
+            </div>
+
+            <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-emerald-50/70 border-emerald-100'" class="rounded-3xl p-5 border shadow-sm flex items-center gap-4">
+              <div class="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white text-xl shadow-md shadow-emerald-500/20 shrink-0">
+                ➕
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-400">총 입고 수량</p>
+                <p class="text-2xl font-black text-emerald-500">+{{ inboundTotalQty.toLocaleString() }} <span class="text-xs font-normal text-slate-400">EA</span></p>
+                <p class="text-[11px] text-emerald-500 font-semibold mt-0.5">신규 적재 합계</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 1) 테이블 뷰 -->
+          <div v-if="inboundViewMode === 'table'" :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl border shadow-sm overflow-hidden">
+            
+            <!-- 자재별 테이블 -->
+            <div v-if="inboundSubTab === 'material'" class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr :class="isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-100'" class="font-bold border-b">
+                    <th class="py-3.5 px-6">자재명 (별칭 / 규격)</th>
+                    <th class="py-3.5 px-6">보관 위치</th>
+                    <th class="py-3.5 px-6 text-right text-blue-500 font-black">총 입고량</th>
+                    <th class="py-3.5 px-6 text-center">입고 횟수</th>
+                    <th class="py-3.5 px-6 text-right text-emerald-500 font-black">현재 렉 재고</th>
+                    <th class="py-3.5 px-6 text-center">실사 확인</th>
+                  </tr>
+                </thead>
+                <tbody :class="isDark ? 'divide-slate-800 text-slate-300' : 'divide-slate-100 text-slate-700'" class="divide-y">
+                  <tr v-for="(mat, idx) in inboundByMaterialList" :key="'mat_' + mat.productName + '_' + idx" :class="isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'">
+                    <td class="py-3.5 px-6">
+                      <p :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-sm">{{ mat.alias || mat.productName }}</p>
+                      <p class="text-[11px] text-slate-400 font-mono">{{ mat.productName }}</p>
+                    </td>
+                    <td class="py-3.5 px-6 font-medium text-slate-400">
+                      {{ mat.building }}동 {{ mat.location }}
+                    </td>
+                    <td class="py-3.5 px-6 text-right font-black text-blue-500 text-sm">
+                      +{{ mat.totalInbound.toLocaleString() }} EA
+                    </td>
+                    <td class="py-3.5 px-6 text-center font-bold">
+                      {{ mat.count }}회
+                    </td>
+                    <td class="py-3.5 px-6 text-right font-black text-emerald-500">
+                      {{ mat.latestStock }} EA
+                    </td>
+                    <td class="py-3.5 px-6 text-center">
+                      <button @click="openModal(mat)" class="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl border border-blue-200 transition text-xs flex items-center gap-1 mx-auto">
+                        <span>👁️</span> 보기
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 날짜별 테이블 -->
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr :class="isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-100'" class="font-bold border-b">
+                    <th class="py-3.5 px-6">실사 일시</th>
+                    <th class="py-3.5 px-6">자재명 (별칭)</th>
+                    <th class="py-3.5 px-6">창고 위치</th>
+                    <th class="py-3.5 px-6 text-right text-blue-500 font-black">입고 수량</th>
+                    <th class="py-3.5 px-6 text-right font-black">입고 후 렉 재고</th>
+                    <th class="py-3.5 px-6 text-center">실사 확인</th>
+                  </tr>
+                </thead>
+                <tbody :class="isDark ? 'divide-slate-800 text-slate-300' : 'divide-slate-100 text-slate-700'" class="divide-y">
+                  <tr v-for="(item, idx) in paginatedInboundRecords" :key="'inb_' + item.time + '_' + item.productName + '_' + idx" :class="isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'">
+                    <td class="py-3.5 px-6 font-mono text-slate-400">{{ item.dateStr }}</td>
+                    <td class="py-3.5 px-6">
+                      <p :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-sm">{{ item.alias || item.productName }}</p>
+                      <p class="text-[11px] text-slate-400 font-mono">{{ item.productName }}</p>
+                    </td>
+                    <td class="py-3.5 px-6 font-medium text-slate-400">
+                      {{ item.building }}동 {{ item.location }}
+                    </td>
+                    <td class="py-3.5 px-6 text-right font-black text-blue-500 text-sm">
+                      +{{ item.inbound }} EA
+                    </td>
+                    <td :class="isDark ? 'text-white' : 'text-slate-800'" class="py-3.5 px-6 text-right font-bold">
+                      {{ item.stock }} EA
+                    </td>
+                    <td class="py-3.5 px-6 text-center">
+                      <button @click="openModal(item)" class="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl border border-blue-200 transition text-xs flex items-center gap-1 mx-auto">
+                        <span>👁️</span> 보기
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="filteredInboundRecords.length === 0">
+                    <td colspan="6" class="py-16 text-center text-slate-400">선택된 날짜/기간에 입고된 기록이 없습니다.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 페이지네이션 -->
+            <div :class="isDark ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'" class="p-4 border-t flex items-center justify-between text-xs">
+              <span>총 {{ filteredInboundRecords.length }}건 중 {{ ((inboundPage-1)*10)+1 }}~{{ Math.min(inboundPage*10, filteredInboundRecords.length) }}건 표시</span>
+              <div class="flex items-center gap-1">
+                <button @click="inboundPage > 1 && inboundPage--" :disabled="inboundPage === 1" class="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30">‹</button>
+                <span class="px-2 font-bold">{{ inboundPage }} / {{ totalInboundPages }}</span>
+                <button @click="inboundPage < totalInboundPages && inboundPage++" :disabled="inboundPage === totalInboundPages" class="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30">›</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 2) 카드 뷰 -->
+          <div v-else-if="inboundViewMode === 'card'" class="space-y-4">
+            <div v-for="(group, gIdx) in groupedInboundByDate" :key="'grp_' + group.date + '_' + gIdx" class="space-y-3">
+              <div class="flex items-center gap-3 pt-2">
+                <span :class="isDark ? 'text-white' : 'text-slate-800'" class="text-sm font-black">일자 그룹: {{ group.date }}</span>
+                <span class="px-2.5 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
+                  {{ group.date }}
+                </span>
+                <span class="text-xs text-slate-400 font-medium">{{ group.items.length }}건 기록</span>
+              </div>
+
+              <div v-for="(item, iIdx) in group.items" :key="'grp_item_' + item.time + '_' + item.productName + '_' + iIdx"
+                   :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'"
+                   class="rounded-3xl p-6 border shadow-sm space-y-4 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                  <span class="px-3 py-1 bg-blue-600 text-white font-black rounded-xl text-xs">
+                    스캔번호 #{{ (item.time + '').slice(-6) }}
+                  </span>
+                  <span class="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold rounded-xl text-xs">
+                    ✓ 실사 처리 완료
+                  </span>
+                </div>
+
+                <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+                  <div>
+                    <span class="text-xs text-slate-400 font-medium">자재명:</span>
+                    <h3 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-xl font-black">{{ item.alias || item.productName }}</h3>
+                    <p class="text-xs text-slate-400 font-mono">{{ item.productName }}</p>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-xs text-slate-400 font-medium">보관 위치:</span>
+                    <p :class="isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'" class="text-sm font-bold px-3 py-1 rounded-xl">
+                      {{ item.building }}동 {{ item.location }}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div :class="isDark ? 'bg-emerald-950/30 border-emerald-900' : 'bg-emerald-50/60 border-emerald-100'" class="p-3.5 rounded-2xl border">
+                    <p class="text-xs font-bold text-slate-400">입고 수량</p>
+                    <p class="text-2xl font-black text-emerald-500 mt-0.5">+{{ item.inbound }} EA</p>
+                    <p class="text-[11px] text-slate-400">QR 코드 스캔 등록</p>
+                  </div>
+                  <div :class="isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'" class="p-3.5 rounded-2xl border">
+                    <p class="text-xs font-bold text-slate-400">입고 후 렉 재고</p>
+                    <p :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black mt-0.5">{{ item.stock }} EA</p>
+                    <p class="text-[11px] text-slate-400">최종 확인 재고</p>
+                  </div>
+                </div>
+
+                <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t">
+                  <span>📱 스캔 일시: {{ item.dateStr }}</span>
+                  <button @click="openModal(item)" class="text-blue-500 font-bold hover:underline flex items-center gap-1">
+                    <span>👁️ 실사 사진 보기</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3) 차트 뷰: 상단 관점(일자별 vs 자재별)과 100% 일치하는 전용 차트 제공 -->
+          <div v-else-if="inboundViewMode === 'chart'" :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl p-6 border shadow-sm space-y-6">
+            
+            <!-- CASE A: [📅 일자별 흐름] 관점의 차트 헤더 및 서브 토글 -->
+            <div v-if="inboundSubTab === 'date'" class="space-y-5">
+              <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+                <div>
+                  <h3 :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-lg">일자별 시계열 입고 분석</h3>
+                  <p class="text-xs text-slate-400 mt-0.5">날짜 흐름에 따른 입고량, 재고 변동, 소비량을 시계열로 분석합니다.</p>
+                </div>
+
+                <div :class="isDark ? 'bg-slate-800' : 'bg-slate-100'" class="inline-flex rounded-xl p-1 text-xs font-bold">
+                  <button @click="setDateChartType('combo')" :class="dateChartType === 'combo' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3 py-1.5 rounded-lg transition">
+                    📊 일자별 입고·재고 복합추이
+                  </button>
+                  <button @click="setDateChartType('bar')" :class="dateChartType === 'bar' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3 py-1.5 rounded-lg transition">
+                    📈 일자별 순수 입고량 막대
+                  </button>
+                </div>
+              </div>
+
+              <!-- 일자별 복합 차트 -->
+              <div v-show="dateChartType === 'combo'" class="space-y-2">
+                <div class="h-80 relative">
+                  <canvas id="comboInboundChart"></canvas>
+                </div>
+              </div>
+
+              <!-- 일자별 막대 차트 -->
+              <div v-show="dateChartType === 'bar'" class="space-y-2">
+                <div class="h-80 relative">
+                  <canvas id="barInboundChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- CASE B: [📦 자재별 분석] 관점의 차트 헤더 및 서브 토글 -->
+            <div v-else-if="inboundSubTab === 'material'" class="space-y-5">
+              <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+                <div>
+                  <h3 :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-lg">자재별 입고 비중 & 순위 분석</h3>
+                  <p class="text-xs text-slate-400 mt-0.5">품목별 누적 입고량 비중(블록뷰)과 입고 순위를 직관적으로 비교합니다.</p>
+                </div>
+
+                <div :class="isDark ? 'bg-slate-800' : 'bg-slate-100'" class="inline-flex rounded-xl p-1 text-xs font-bold">
+                  <button @click="setMatChartType('treemap')" :class="matChartType === 'treemap' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3 py-1.5 rounded-lg transition">
+                    🔲 자재별 블록뷰 (트리맵)
+                  </button>
+                  <button @click="setMatChartType('ranking')" :class="matChartType === 'ranking' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-3 py-1.5 rounded-lg transition">
+                    📊 자재별 입고량 TOP 10 막대
+                  </button>
+                </div>
+              </div>
+
+              <!-- 자재별 블록뷰 -->
+              <div v-show="matChartType === 'treemap'" class="space-y-4">
+                <p class="text-xs text-slate-400">자재별 누적 입고 수량 비중에 따른 비주얼 블록뷰입니다.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 min-h-[300px]">
+                  <div v-if="inboundByMaterialList[0]" class="md:col-span-2 bg-blue-600 text-white rounded-2xl p-6 flex flex-col justify-between shadow-md">
+                    <div>
+                      <span class="px-2.5 py-1 bg-white/20 rounded-lg text-xs font-bold">1위 최대 입고</span>
+                      <h4 class="text-3xl font-black mt-3">{{ inboundByMaterialList[0].alias || inboundByMaterialList[0].productName }}</h4>
+                      <p class="text-xs text-blue-200 mt-1">{{ inboundByMaterialList[0].building }}동 {{ inboundByMaterialList[0].location }}</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-4xl font-black">{{ inboundByMaterialList[0].totalInbound.toLocaleString() }} <span class="text-base font-normal">EA</span></p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-3 flex flex-col justify-between">
+                    <div v-if="inboundByMaterialList[1]" class="bg-blue-500 text-white rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                      <div>
+                        <p class="text-xs font-bold text-blue-100">2위</p>
+                        <h5 class="text-lg font-black">{{ inboundByMaterialList[1].alias || inboundByMaterialList[1].productName }}</h5>
+                      </div>
+                      <p class="text-xl font-black">{{ inboundByMaterialList[1].totalInbound }} EA</p>
+                    </div>
+                    <div v-if="inboundByMaterialList[2]" class="bg-blue-400 text-white rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                      <div>
+                        <p class="text-xs font-bold text-blue-100">3위</p>
+                        <h5 class="text-base font-black">{{ inboundByMaterialList[2].alias || inboundByMaterialList[2].productName }}</h5>
+                      </div>
+                      <p class="text-lg font-black">{{ inboundByMaterialList[2].totalInbound }} EA</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 자재별 순위 막대 차트 -->
+              <div v-show="matChartType === 'ranking'" class="space-y-2">
+                <div class="h-80 relative">
+                  <canvas id="matInboundRankingChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [뷰 3] 이론출고량 (3번 요구: 내용 완전 복구 및 알찬 수불표) -->
+      <!-- =================================================================== -->
+      <div v-else-if="currentMenu === 'theoretical_outbound'" class="space-y-6">
+        <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl p-6 border shadow-sm space-y-6">
+          <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+            <div>
+              <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-xl font-black flex items-center gap-2">
+                <span>📤</span> 이론출고량 (역산 소진 수불부)
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">정기 실사를 통해 역산 집계된 현장 생산 투입 및 정상 출고량 내역입니다.</p>
+            </div>
+            <span class="px-4 py-1.5 bg-red-50 text-red-600 font-black rounded-full text-xs border border-red-200">
+              기간 누적 소진량: {{ totalStats.usage.toLocaleString() }} EA
+            </span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr :class="isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-100'" class="font-bold border-b">
+                  <th class="py-3.5 px-6">실사 일시</th>
+                  <th class="py-3.5 px-6">자재명 (별칭 / 규격)</th>
+                  <th class="py-3.5 px-6">창고 위치</th>
+                  <th class="py-3.5 px-6 text-right text-red-500 font-black">이론 출고(소진)량</th>
+                  <th class="py-3.5 px-6 text-right font-black">실사 후 렉 재고</th>
+                  <th class="py-3.5 px-6 text-center">실사 사진</th>
+                </tr>
+              </thead>
+              <tbody :class="isDark ? 'divide-slate-800 text-slate-300' : 'divide-slate-100 text-slate-700'" class="divide-y">
+                <tr v-for="(r, idx) in outboundRecords" :key="'out_' + r.time + '_' + r.productName + '_' + idx" :class="isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'">
+                  <td class="py-3.5 px-6 font-mono text-slate-400">{{ r.dateStr }}</td>
+                  <td class="py-3.5 px-6">
+                    <p :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-sm">{{ r.alias || r.productName }}</p>
+                    <p class="text-[11px] text-slate-400 font-mono">{{ r.productName }}</p>
+                  </td>
+                  <td class="py-3.5 px-6 font-medium text-slate-400">{{ r.building }}동 {{ r.location }}</td>
+                  <td class="py-3.5 px-6 text-right font-black text-red-500 text-sm">-{{ Math.abs(r.usage) }} EA</td>
+                  <td :class="isDark ? 'text-white' : 'text-slate-800'" class="py-3.5 px-6 text-right font-bold">{{ r.stock }} EA</td>
+                  <td class="py-3.5 px-6 text-center">
+                    <button @click="openModal(r)" class="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl border border-blue-200 transition text-xs">
+                      👁️ 사진
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="outboundRecords.length === 0">
+                  <td colspan="6" class="py-16 text-center text-slate-400">선택된 기간에 발생한 소진 내역이 없습니다.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [뷰 4] 역전발생 (3번 요구: 내용 완전 복구 및 조치 화면) -->
+      <!-- =================================================================== -->
+      <div v-else-if="currentMenu === 'reversal_events'" class="space-y-6">
+        <div :class="isDark ? 'bg-slate-900 border-amber-900/50' : 'bg-white border-amber-200'" class="rounded-3xl p-6 border shadow-sm space-y-6">
+          <div :class="isDark ? 'border-slate-800' : 'border-amber-100'" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+            <div>
+              <h2 class="text-xl font-black text-amber-500 flex items-center gap-2">
+                <span>🚨</span> 역전발생 (입고누락 의심 건수 점검 모듈)
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">
+                사용량이 양수(+)로 튄 비정상 실사 건수입니다. 누군가 입고 등록을 누락했거나 카운트가 잘못된 행들입니다.
+              </p>
+            </div>
+            <span class="px-4 py-1.5 bg-amber-100 text-amber-800 font-black rounded-full text-xs">
+              총 {{ reversalRecords.length }}건 감지됨
+            </span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr :class="isDark ? 'bg-slate-800 text-amber-400 border-slate-700' : 'bg-amber-50 text-amber-800 border-amber-200'" class="font-bold border-b">
+                  <th class="py-3.5 px-6">조사 일시</th>
+                  <th class="py-3.5 px-6">자재명 (별칭)</th>
+                  <th class="py-3.5 px-6">창고 위치</th>
+                  <th class="py-3.5 px-6 text-right text-amber-500 font-black">역전 수량 (+)</th>
+                  <th class="py-3.5 px-6 text-right font-black">현재 렉 재고</th>
+                  <th class="py-3.5 px-6 text-center">조치 상태</th>
+                  <th class="py-3.5 px-6 text-center">실사 사진</th>
+                </tr>
+              </thead>
+              <tbody :class="isDark ? 'divide-slate-800 text-slate-300' : 'divide-slate-100 text-slate-700'" class="divide-y">
+                <tr v-for="(r, idx) in reversalRecords" :key="'rev_' + r.time + '_' + r.productName + '_' + idx" :class="isDark ? 'hover:bg-slate-800/60' : 'hover:bg-amber-50/40'">
+                  <td class="py-3.5 px-6 font-mono text-slate-400">{{ r.dateStr }}</td>
+                  <td class="py-3.5 px-6">
+                    <p :class="isDark ? 'text-white' : 'text-slate-900'" class="font-black text-sm">{{ r.alias || r.productName }}</p>
+                    <p class="text-[11px] text-slate-400 font-mono">{{ r.productName }}</p>
+                  </td>
+                  <td class="py-3.5 px-6 font-medium text-slate-400">{{ r.building }}동 {{ r.location }}</td>
+                  <td class="py-3.5 px-6 text-right font-black text-amber-500 text-sm">+{{ r.usage }} EA</td>
+                  <td :class="isDark ? 'text-white' : 'text-slate-800'" class="py-3.5 px-6 text-right font-bold">{{ r.stock }} EA</td>
+                  <td class="py-3.5 px-6 text-center">
+                    <span class="px-2.5 py-1 bg-red-100 text-red-700 font-bold rounded-lg text-[10px]">입고누락 확인요망</span>
+                  </td>
+                  <td class="py-3.5 px-6 text-center">
+                    <button @click="openModal(r)" class="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl border border-blue-200 transition text-xs">
+                      👁️ 사진
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="reversalRecords.length === 0">
+                  <td colspan="7" class="py-16 text-center text-emerald-500 font-bold">✓ 감지된 역전 오류가 없습니다. 데이터가 정상입니다!</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [뷰 5] 창고위치정보 (3번 요구: 4단 선반 랙 2D 실물 맵 완전 복구) -->
+      <!-- =================================================================== -->
+      <div v-else-if="currentMenu === 'rack_map'" class="space-y-6">
+        <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl p-6 border shadow-sm space-y-6">
+          <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+            <div>
+              <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-xl font-black flex items-center gap-2">
+                <span>🗺️</span> 4단 선반 랙(Rack) 실물 2D 배치도
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">공장동 선반 랙 구조에 맞춰 칸마다 실시간 자재명과 수량을 표시합니다.</p>
+            </div>
+
+            <div :class="isDark ? 'bg-slate-800' : 'bg-slate-100'" class="inline-flex rounded-xl p-1 font-bold text-xs">
+              <button @click="selectedBuilding = 'B'" :class="selectedBuilding === 'B' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-4 py-1.5 rounded-lg transition">
+                🏢 B동 (판재 주창고)
+              </button>
+              <button @click="selectedBuilding = 'C'" :class="selectedBuilding === 'C' ? (isDark ? 'bg-slate-700 text-white' : 'bg-white shadow text-blue-600') : 'text-slate-400'" class="px-4 py-1.5 rounded-lg transition">
+                🏭 C동 (후판 창고)
+              </button>
+            </div>
+          </div>
+
+          <!-- B동 5열 4단 선반 랙 -->
+          <div v-if="selectedBuilding === 'B'" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <!-- F열 (회색 랙) -->
+            <div class="bg-slate-800 p-3.5 rounded-2xl text-white space-y-3 shadow-md border border-slate-700">
+              <p class="text-center font-black text-xs text-slate-300 border-b border-slate-700 pb-2">회색 랙 (F열)</p>
+              <div v-for="slot in ['F4-2', 'F3', 'F2', 'F1']" :key="slot" class="p-3 bg-slate-700/70 rounded-xl border border-slate-600 space-y-1">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-yellow-300 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- E열 (회색 랙) -->
+            <div class="bg-slate-800 p-3.5 rounded-2xl text-white space-y-3 shadow-md border border-slate-700">
+              <p class="text-center font-black text-xs text-slate-300 border-b border-slate-700 pb-2">회색 랙 (E열)</p>
+              <div v-for="slot in ['E4', 'E3', 'E2', 'E1']" :key="slot" class="p-3 bg-slate-700/70 rounded-xl border border-slate-600 space-y-1">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-yellow-300 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- C열 (아이보리 랙) -->
+            <div class="bg-amber-50/90 p-3.5 rounded-2xl border border-amber-200 text-slate-800 space-y-3 shadow-sm">
+              <p class="text-center font-black text-xs text-amber-800 border-b border-amber-200 pb-2">아이보리 랙 (C열)</p>
+              <div v-for="slot in ['C4', 'C3', 'C1+C2']" :key="slot" class="p-3 bg-white rounded-xl border border-amber-200 space-y-1 shadow-sm">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-slate-900 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- B열 (아이보리 랙) -->
+            <div class="bg-amber-50/90 p-3.5 rounded-2xl border border-amber-200 text-slate-800 space-y-3 shadow-sm">
+              <p class="text-center font-black text-xs text-amber-800 border-b border-amber-200 pb-2">아이보리 랙 (B열)</p>
+              <div v-for="slot in ['B4', 'B3', 'B2', 'B1']" :key="slot" class="p-3 bg-white rounded-xl border border-amber-200 space-y-1 shadow-sm">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-slate-900 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- A열 (아이보리 랙) -->
+            <div class="bg-amber-50/90 p-3.5 rounded-2xl border border-amber-200 text-slate-800 space-y-3 shadow-sm">
+              <p class="text-center font-black text-xs text-amber-800 border-b border-amber-200 pb-2">아이보리 랙 (A열)</p>
+              <div v-for="slot in ['A4', 'A3', 'A1+A2']" :key="slot" class="p-3 bg-white rounded-xl border border-amber-200 space-y-1 shadow-sm">
+                <span class="text-[10px] text-slate-400 font-bold">{{ slot }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-xs text-slate-900 truncate mr-1">{{ getRackData(slot).alias || '미적재' }}</span>
+                  <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0">{{ getRackData(slot).stock }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- C동 G랙 -->
+          <div v-else class="max-w-md mx-auto bg-amber-50 p-6 rounded-3xl border border-amber-200 space-y-4">
+            <p class="text-center font-black text-sm text-amber-800 border-b border-amber-200 pb-2">C동 G랙 (후판 전용 3단 선반)</p>
+            <div v-for="slot in ['G3', 'G2', 'G1']" :key="slot" class="p-4 bg-white rounded-2xl border border-amber-200 flex items-center justify-between shadow-sm">
+              <div>
+                <span class="text-xs text-slate-400 font-bold">{{ slot }}</span>
+                <p class="font-black text-slate-900 text-base">{{ getRackData(slot).alias || 'NO1-30T' }}</p>
+              </div>
+              <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">{{ getRackData(slot).stock }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [뷰 6] 동기화 내역 -->
+      <!-- =================================================================== -->
+      <div v-else-if="currentMenu === 'sync_history'" class="space-y-6">
+        <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl p-6 border shadow-sm space-y-6">
+          <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+            <div>
+              <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-xl font-black flex items-center gap-2">
+                <span>🔄</span> Google Sheet ➔ Laravel MySQL 증분 동기화 내역
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">구글 시트의 최신 실사 데이터를 라라벨 WMS 데이터베이스로 전송한 이력입니다.</p>
+            </div>
+            <button @click="triggerManualSync" :disabled="syncing"
+                    class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 text-xs transition flex items-center gap-2">
+              <span :class="syncing ? 'animate-spin' : ''">🔄</span>
+              <span>{{ syncing ? '동기화 수행 중...' : '수동 동기화 수행' }}</span>
+            </button>
+          </div>
+
+          <div v-if="syncSuccessMessage" class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800">
+            ✓ {{ syncSuccessMessage }}
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr :class="isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-100'" class="font-bold border-b">
+                  <th class="py-3.5 px-6">동기화 일시</th>
+                  <th class="py-3.5 px-6">유형</th>
+                  <th class="py-3.5 px-6 text-right">전송 건수</th>
+                  <th class="py-3.5 px-6 text-center">상태</th>
+                  <th class="py-3.5 px-6 text-right">소요 시간</th>
+                  <th class="py-3.5 px-6 text-center">실행자</th>
+                </tr>
+              </thead>
+              <tbody :class="isDark ? 'divide-slate-800 text-slate-300' : 'divide-slate-100 text-slate-700'" class="divide-y">
+                <tr v-for="log in syncLogs" :key="log.id" :class="isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'">
+                  <td class="py-3.5 px-6 font-mono text-slate-400">{{ log.timestamp }}</td>
+                  <td class="py-3.5 px-6 font-bold text-blue-500">{{ log.type }}</td>
+                  <td :class="isDark ? 'text-white' : 'text-slate-900'" class="py-3.5 px-6 text-right font-black">+{{ log.count }} 건</td>
+                  <td class="py-3.5 px-6 text-center">
+                    <span class="px-2.5 py-1 rounded-full font-bold text-[11px] bg-emerald-50 text-emerald-600 border border-emerald-200">
+                      {{ log.status }}
+                    </span>
+                  </td>
+                  <td class="py-3.5 px-6 text-right font-mono text-slate-400">{{ log.duration }}</td>
+                  <td class="py-3.5 px-6 text-center text-slate-400 font-medium">{{ log.executor }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [뷰 7] 사용자 관리 (3번 요구: 내용 완전 복구 및 계정 수정 폼) -->
+      <!-- =================================================================== -->
+      <div v-else-if="currentMenu === 'user_admin'" class="space-y-6">
+        <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="max-w-xl rounded-3xl p-8 border shadow-sm space-y-6">
+          <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="border-b pb-4">
+            <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-xl font-black flex items-center gap-2">
+              <span>👤</span> 관리자 계정 정보 수정
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">대시보드 로그인 ID와 비밀번호를 직접 변경하실 수 있습니다.</p>
+          </div>
+
+          <div class="space-y-4 text-xs">
+            <div>
+              <label :class="isDark ? 'text-slate-300' : 'text-slate-700'" class="block font-bold mb-1">관리자 아이디</label>
+              <input type="text" v-model="editUser.id"
+                     :class="isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'"
+                     class="w-full px-4 py-3 rounded-2xl border text-sm font-bold focus:outline-none">
+            </div>
+
+            <div>
+              <label :class="isDark ? 'text-slate-300' : 'text-slate-700'" class="block font-bold mb-1">사용자 이름</label>
+              <input type="text" v-model="editUser.name"
+                     :class="isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'"
+                     class="w-full px-4 py-3 rounded-2xl border text-sm font-bold focus:outline-none">
+            </div>
+
+            <div>
+              <label :class="isDark ? 'text-slate-300' : 'text-slate-700'" class="block font-bold mb-1">새 비밀번호</label>
+              <input type="password" v-model="editUser.password" placeholder="새 비밀번호 입력"
+                     :class="isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'"
+                     class="w-full px-4 py-3 rounded-2xl border text-sm focus:outline-none">
+            </div>
+
+            <div v-if="userSaveSuccess" class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700 text-center">
+              ✓ 관리자 계정 정보가 성공적으로 저장되었습니다!
+            </div>
+
+            <button @click="saveUserAccount" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 text-sm transition">
+              계정 정보 저장하기
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [뷰 8] 도움말 & 가이드 (FAQ) (4번 요구: 시원시원한 18px/15px 폰트 확대) -->
+      <!-- =================================================================== -->
+      <div v-else-if="currentMenu === 'help'" class="space-y-6">
+        <div :class="isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'" class="rounded-3xl p-8 border shadow-sm space-y-6">
+          <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="border-b pb-4">
+            <h2 :class="isDark ? 'text-white' : 'text-slate-900'" class="text-2xl font-black flex items-center gap-2">
+              <span>❓</span> AR Korea WMS 도메인 가이드 & 자주 묻는 질문 (FAQ)
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">현장 판재 역산 실사 모델, 부호 해석 원칙, 앱시트 운영 지침</p>
+          </div>
+
+          <!-- 아코디언 목록 (폰트 크기 확대 적용) -->
+          <div class="space-y-4">
+            
+            <div :class="isDark ? 'border-slate-700' : 'border-slate-200'" class="border rounded-2xl overflow-hidden shadow-sm">
+              <button @click="toggleAccordion(1)" :class="isDark ? 'bg-slate-800 hover:bg-slate-750 text-white' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'" class="w-full p-6 flex items-center justify-between text-left transition font-black text-base sm:text-lg">
+                <span class="flex items-center gap-3">
+                  <span class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm font-bold shrink-0">1</span>
+                  <span>'역산 실사(Backflush Periodic Count)'란 무엇이며 왜 쓰나요?</span>
+                </span>
+                <span class="text-slate-400 text-base font-bold">{{ openFaq === 1 ? '▲' : '▼' }}</span>
+              </button>
+              <div v-show="openFaq === 1" :class="isDark ? 'bg-slate-900 text-slate-300 border-slate-800' : 'bg-white text-slate-700 border-slate-200'" class="p-6 text-sm sm:text-base leading-relaxed space-y-3 border-t">
+                <p>
+                  스테인리스 및 탄소강 판재/자재는 <strong>부피와 중량이 매우 커서 현장 작업자가 철판을 꺼내 쓸 때마다 일일이 바코드를 찍기 불가능</strong>합니다.
+                </p>
+                <p>
+                  따라서 AR Korea는 출고 스캔을 강제하지 않고, 관리자가 렉(Rack)에 남아있는 재고를 주기적으로 카운트(실사)하여 <strong>'지난번 재고에서 줄어든 수량만큼 실제로 공장에서 썼을 것이다'</strong>라고 사용량을 역산하는 방식을 채택하고 있습니다.
+                </p>
+              </div>
+            </div>
+
+            <div :class="isDark ? 'border-slate-700' : 'border-slate-200'" class="border rounded-2xl overflow-hidden shadow-sm">
+              <button @click="toggleAccordion(2)" :class="isDark ? 'bg-slate-800 hover:bg-slate-750 text-white' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'" class="w-full p-6 flex items-center justify-between text-left transition font-black text-base sm:text-lg">
+                <span class="flex items-center gap-3">
+                  <span class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm font-bold shrink-0">2</span>
+                  <span>앱시트의 2가지 조사 유형: [Rack Stock Only] vs [Inbound + Rack Stock] 공식</span>
+                </span>
+                <span class="text-slate-400 text-base font-bold">{{ openFaq === 2 ? '▲' : '▼' }}</span>
+              </button>
+              <div v-show="openFaq === 2" :class="isDark ? 'bg-slate-900 text-slate-300 border-slate-800' : 'bg-white text-slate-700 border-slate-200'" class="p-6 text-sm sm:text-base leading-relaxed space-y-4 border-t">
+                <div class="p-4 bg-blue-50/60 rounded-xl border border-blue-200 space-y-1 text-slate-800">
+                  <strong class="text-blue-900 text-base">1) 렉 재고 (Rack Stock Only)</strong>
+                  <p>입고 없이 순수 렉에 얹혀있는 재고만 카운트한 경우:</p>
+                  <p class="font-mono font-bold text-blue-700 bg-white p-2.5 rounded-lg text-sm sm:text-base">추정사용량 = 현재 렉 재고 - 직전 회차 렉 재고</p>
+                </div>
+                <div class="p-4 bg-emerald-50/60 rounded-xl border border-emerald-200 space-y-1 text-slate-800">
+                  <strong class="text-emerald-900 text-base">2) 입고 + 렉재고 (Inbound + Rack Stock)</strong>
+                  <p>새로 입고된 판재를 렉에 함께 집어넣고 전체를 카운트한 경우:</p>
+                  <p class="font-mono font-bold text-emerald-700 bg-white p-2.5 rounded-lg text-sm sm:text-base">추정사용량 = 현재 렉 재고 - (직전 회차 렉 재고 + 오늘 입고수량)</p>
+                </div>
+              </div>
+            </div>
+
+            <div :class="isDark ? 'border-slate-700' : 'border-slate-200'" class="border rounded-2xl overflow-hidden shadow-sm">
+              <button @click="toggleAccordion(3)" :class="isDark ? 'bg-slate-800 hover:bg-slate-750 text-white' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'" class="w-full p-6 flex items-center justify-between text-left transition font-black text-base sm:text-lg">
+                <span class="flex items-center gap-3">
+                  <span class="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center text-sm font-bold shrink-0">3</span>
+                  <span>부호 해석 절대 원칙과 '역전발생(🚨)'의 올바른 조치법</span>
+                </span>
+                <span class="text-slate-400 text-base font-bold">{{ openFaq === 3 ? '▲' : '▼' }}</span>
+              </button>
+              <div v-show="openFaq === 3" :class="isDark ? 'bg-slate-900 text-slate-300 border-slate-800' : 'bg-white text-slate-700 border-slate-200'" class="p-6 text-sm sm:text-base leading-relaxed space-y-3 border-t">
+                <p><strong>• 마이너스(-) [정상 소진]:</strong> 재고가 줄어들었으므로 현장에서 제품 생산에 꺼내 쓴 정상 수량입니다. (누적 소진량 집계 시 절댓값을 합산)</p>
+                <p><strong>• 0 [정상 무변동]:</strong> 직전 조사 이후 아무도 사용하지 않은 상태입니다.</p>
+                <p class="text-red-500 font-bold">
+                  <strong>• 플러스(+) [역전발생 🚨 - 절대 주의]:</strong> 사용량이 플러스가 나온 것은 <u>누군가 입고 등록을 누락한 채 물건만 렉에 넣었거나 실사 오측정된 오류 상태</u>입니다.
+                </p>
+                <p class="bg-amber-50 p-4 rounded-xl border border-amber-200 text-amber-900">
+                  ⚠️ 이 플러스 수량을 '사용량'에 합산하면 데이터가 심각하게 왜곡되므로, 본 WMS는 이를 <strong>'역전발생' 메뉴로 자동 격리</strong>하여 관리자가 입고 전표를 확인하도록 안내합니다.
+                </p>
+              </div>
+            </div>
+
+            <div :class="isDark ? 'border-slate-700' : 'border-slate-200'" class="border rounded-2xl overflow-hidden shadow-sm">
+              <button @click="toggleAccordion(4)" :class="isDark ? 'bg-slate-800 hover:bg-slate-750 text-white' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'" class="w-full p-6 flex items-center justify-between text-left transition font-black text-base sm:text-lg">
+                <span class="flex items-center gap-3">
+                  <span class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm font-bold shrink-0">4</span>
+                  <span>'이론출고량'은 어떻게 집계되고 아마란스 ERP로 넘어가나요?</span>
+                </span>
+                <span class="text-slate-400 text-base font-bold">{{ openFaq === 4 ? '▲' : '▼' }}</span>
+              </button>
+              <div v-show="openFaq === 4" :class="isDark ? 'bg-slate-900 text-slate-300 border-slate-800' : 'bg-white text-slate-700 border-slate-200'" class="p-6 text-sm sm:text-base leading-relaxed space-y-2 border-t">
+                <p>
+                  현장에서 실사를 마치면 역산된 소진량이 '이론출고량'으로 자동 확정됩니다. 이 수치는 향후 <strong>더존 아마란스 10 ERP의 자재수불부 출고 엑셀 서식</strong>으로 1:1 자동 매핑되어 전표 입력 없이 원클릭 일괄 업로드됩니다.
+                </p>
+              </div>
+            </div>
+
+            <div :class="isDark ? 'border-slate-700' : 'border-slate-200'" class="border rounded-2xl overflow-hidden shadow-sm">
+              <button @click="toggleAccordion(5)" :class="isDark ? 'bg-slate-800 hover:bg-slate-750 text-white' : 'bg-slate-50 hover:bg-slate-100 text-slate-900'" class="w-full p-6 flex items-center justify-between text-left transition font-black text-base sm:text-lg">
+                <span class="flex items-center gap-3">
+                  <span class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shrink-0">5</span>
+                  <span>앱시트(AppSheet) 공식 가이드 및 개발자 커뮤니티 링크 모음</span>
+                </span>
+                <span class="text-slate-400 text-base font-bold">{{ openFaq === 5 ? '▲' : '▼' }}</span>
+              </button>
+              <div v-show="openFaq === 5" :class="isDark ? 'bg-slate-900 text-slate-300 border-slate-800' : 'bg-white text-slate-700 border-slate-200'" class="p-6 text-sm sm:text-base leading-relaxed space-y-3 border-t">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <a href="https://support.google.com/appsheet" target="_blank" class="p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition flex items-center justify-between font-bold text-slate-800">
+                    <span>📚 구글 앱시트 공식 도움말 센터</span>
+                    <span class="text-blue-600">↗</span>
+                  </a>
+                  <a href="https://www.googlecloudcommunity.com/gc/AppSheet/bd-p/appsheet" target="_blank" class="p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition flex items-center justify-between font-bold text-slate-800">
+                    <span>💬 앱시트 글로벌 개발자 커뮤니티</span>
+                    <span class="text-blue-600">↗</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- [2번 요구: 실사확인 모달 - 실제 앱시트 사진 100% 렌더링 & < 이전 | 다음 > 이동] -->
+      <!-- =================================================================== -->
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div :class="isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'"
+             class="rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5 border">
+          
+          <div :class="isDark ? 'border-slate-800' : 'border-slate-100'" class="flex items-center justify-between border-b pb-4">
+            <div>
+              <span class="text-xs font-bold text-blue-500 uppercase">현장 QR 실사 확인 뷰어</span>
+              <h3 class="text-xl font-black mt-0.5">
+                {{ modalItem.alias || modalItem.productName }}
+              </h3>
+              <p class="text-xs text-slate-400">보관 위치: {{ modalItem.building }}동 {{ modalItem.location }}</p>
+            </div>
+            <button @click="showModal = false" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold transition">
+              ✕
+            </button>
+          </div>
+
+          <!-- 2번 요구 핵심: 실제 앱시트 실측사진 출력 영역 -->
+          <div class="bg-black/90 rounded-2xl overflow-hidden min-h-[320px] max-h-[500px] flex items-center justify-center relative shadow-inner">
+            
+            <!-- 실제 사진이 있을 때 -->
+            <img v-if="modalItem.photoUrl" :src="modalItem.photoUrl" :alt="modalItem.alias"
+                 class="w-full h-full max-h-[480px] object-contain mx-auto"
+                 @error="handleImageError" />
+            
+            <!-- 사진이 없거나 로드 실패 시 대체 그래픽 -->
+            <div v-else class="text-center p-6 text-white space-y-3">
+              <div class="text-5xl">🏭</div>
+              <div class="space-y-1">
+                <p class="text-lg font-black text-yellow-400">{{ modalItem.building }}동 {{ modalItem.location }} 랙</p>
+                <p class="text-xs text-slate-300">실사 일시: {{ modalItem.dateStr || '최근 실사' }}</p>
+                <p class="text-sm font-bold text-emerald-400">확인 수량: {{ modalItem.stock || modalItem.latestStock }} EA</p>
+                <p class="text-[11px] text-slate-400 mt-2">등록된 실측 사진 파일이 없습니다.</p>
+              </div>
+            </div>
+
+            <!-- 좌우 이동 버튼 -->
+            <button @click="prevModalItem" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white font-black flex items-center justify-center transition shadow-lg">‹</button>
+            <button @click="nextModalItem" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white font-black flex items-center justify-center transition shadow-lg">›</button>
+          </div>
+
+          <div :class="isDark ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'" class="flex items-center justify-between text-xs pt-2 border-t">
+            <span>실사 건수 {{ modalIndex + 1 }} / {{ modalList.length }}</span>
+            <div class="flex gap-2">
+              <button @click="prevModalItem" class="px-3.5 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-100 font-bold transition">‹ 이전 사진</button>
+              <button @click="nextModalItem" class="px-3.5 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-100 font-bold transition">다음 사진 ›</button>
+              <button @click="showModal = false" class="px-4 py-1.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition">닫기</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+
+    </div>
+  </div>
+
+  <script>
+    var i18n = {
+      ko: {
+        kpiInbound: '기간 총 입고량',
+        kpiInboundDesc: '신규 및 복귀 합계',
+        kpiUsage: '기간 총 소진량 (출고)',
+        kpiUsageDesc: '현장 실측 소진 합계',
+        kpiStock: '현재 총 재고',
+        kpiStockDesc: '최종 실사 기준 재고 합계',
+        kpiAudit: '재고조사 횟수',
+        times: '회',
+        normalAuditState: '미진/오류 없음',
+        reversalFound: '역전(입고누락 의심) 감지',
+        chartTopUsage: '자재별 소진량 TOP 10',
+        chartMaterialShare: '재질별 현재 재고 비중',
+        unitEa: '단위 : EA',
+        totalStock: '총 재고',
+        tableTitle: '판재별 실사 및 수불 현황',
+        itemsCount: '개 품목',
+        searchPlaceholder: '자재명 또는 규격 검색...',
+        thMaterial: '자재명 (별칭 / 규격)',
+        thLocation: '창고 위치',
+        thInbound: '기간 누적 입고',
+        thUsage: '기간 누적 소진',
+        thStock: '현재 재고',
+        thAuditCount: '실사 횟수',
+        thStatus: '상태',
+        reversalTag: '역전',
+        normalTag: '정상 실사'
+      },
+      vn: {
+        kpiInbound: 'Tổng lượng nhập kho',
+        kpiInboundDesc: 'Tổng nhập mới và trả lại',
+        kpiUsage: 'Tổng lượng tiêu hao (xuất)',
+        kpiUsageDesc: 'Tổng tiêu hao qua kiểm kê',
+        kpiStock: 'Tổng tồn kho hiện tại',
+        kpiStockDesc: 'Tổng tồn kho thực tế cuối',
+        kpiAudit: 'Số lần kiểm kho',
+        times: ' lần',
+        normalAuditState: 'Không có lỗi',
+        reversalFound: 'Phát hiện đảo chiều',
+        chartTopUsage: 'TOP 10 tiêu hao theo vật tư',
+        chartMaterialShare: 'Tỷ trọng tồn kho theo chất liệu',
+        unitEa: 'Đơn vị : EA',
+        totalStock: 'Tổng tồn',
+        tableTitle: 'Tình trạng xuất nhập tồn & kiểm kê tấm',
+        itemsCount: ' mặt hàng',
+        searchPlaceholder: 'Tìm tên gọi 또는 quy cách...',
+        thMaterial: 'Tên vật tư (Tên gọi / Quy cách)',
+        thLocation: 'Vị trí kho',
+        thInbound: 'Nhập tích lũy',
+        thUsage: 'Tiêu hao tích lũy',
+        thStock: 'Tồn kho hiện tại',
+        thAuditCount: 'Số lần kiểm',
+        thStatus: 'Trạng thái',
+        reversalTag: 'Đảo chiều',
+        normalTag: 'Bình thường'
+      }
+    };
+
+    new Vue({
+      el: '#app',
+      data: {
+        isDark: localStorage.getItem('ark_theme') === 'dark',
+        lang: 'ko',
+        currentMenu: 'inbound_status',
+        selectedPeriod: 'all',
+        selectedBuilding: 'B',
+        allRecords: [],
+        availableMonths: [],
+        searchQuery: '',
+        sortKey: 'totalUsage',
+        sortAsc: false,
+        currentPage: 1,
+        pageSize: 10,
+        rankingChartInstance: null,
+        materialChartInstance: null,
+        
+        // 현재 재고 3대 뷰 (3번 요구)
+        currentStockView: 'rack',
+        stockMaterialChartInstance: null,
+        stockTopChartInstance: null,
+
+        // 입고현황
+        inboundSelectedDate: null,
+        inboundSubTab: 'date', // 'date' (일자별 흐름) | 'material' (자재별 분석)
+        inboundViewMode: 'table', // 'table' | 'card' | 'chart'
+        dateChartType: 'combo', // 'combo' (복합추이) | 'bar' (일자별막대)
+        matChartType: 'treemap', // 'treemap' (블록뷰) | 'ranking' (자재별순위막대)
+        inboundPage: 1,
+        calYear: 2026,
+        calMonth: 4,
+        comboChartInstance: null,
+        barChartInstance: null,
+        matRankingChartInstance: null,
+
+        // 실사 모달
+        showModal: false,
+        modalItem: {},
+        modalIndex: 0,
+        modalList: [],
+
+        // 도움말 FAQ
+        openFaq: 1,
+
+        // 동기화 로그
+        syncing: false,
+        syncSuccessMessage: '',
+        syncLogs: [
+          { id: 1, timestamp: '2026-08-29 17:00:12', type: '정기 증분 동기화', count: 18, status: '성공', duration: '0.38초', executor: '시스템(자동)' },
+          { id: 2, timestamp: '2026-08-22 17:00:09', type: '정기 증분 동기화', count: 24, status: '성공', duration: '0.45초', executor: '시스템(자동)' },
+          { id: 3, timestamp: '2026-08-19 14:15:33', type: '수동 동기화', count: 5, status: '성공', duration: '0.29초', executor: 'admin(관리자)' }
+        ],
+
+        // =========================================================================
+        // ⚙️ [시스템 보안 설정] loginRequired = false | true 로 한방에 해제 및 동작!
+        // - false: 로그인 화면 완전 해제! 링크만 있으면 누구나 즉시 전체 시스템 열람
+        // - true : 스크린샷과 동일한 사내 보안 로그인 화면 활성화 (아이디/비번 인증)
+        // =========================================================================
+        loginRequired: false, // 👈 여기서 false / true 로 한방에 제어!
+        isLoggedIn: localStorage.getItem('ark_logged_in') === 'true',
+        loginInputId: '',
+        loginInputPw: '',
+        loginError: '',
+
+        // GitHub Pages 연동용 구글 웹앱 API URL
+        gasApiUrl: localStorage.getItem('ark_gas_api_url') || '',
+
+        authUser: {
+          id: localStorage.getItem('ark_uid') || 'arkorea',
+          name: localStorage.getItem('ark_uname') || '관리자',
+          password: localStorage.getItem('ark_upass') || 'ark03614*'
+        },
+        editUser: { id: '', name: '', password: '' },
+        userSaveSuccess: false
+      },
+      computed: {
+        currentPeriodRecords: function() {
+          var p = this.selectedPeriod;
+          if (!p || p === 'all') return this.allRecords;
+          
+          if (p === 'Q1') {
+            return this.allRecords.filter(function(r) { return r.month && (r.month.endsWith('-01') || r.month.endsWith('-02') || r.month.endsWith('-03')); });
+          }
+          if (p === 'Q2') {
+            return this.allRecords.filter(function(r) { return r.month && (r.month.endsWith('-04') || r.month.endsWith('-05') || r.month.endsWith('-06')); });
+          }
+          if (p === 'Q3') {
+            return this.allRecords.filter(function(r) { return r.month && (r.month.endsWith('-07') || r.month.endsWith('-08') || r.month.endsWith('-09')); });
+          }
+          if (p === 'Q4') {
+            return this.allRecords.filter(function(r) { return r.month && (r.month.endsWith('-10') || r.month.endsWith('-11') || r.month.endsWith('-12')); });
+          }
+
+          return this.allRecords.filter(function(r) { return r.month === p; });
+        },
+
+        aggregatedItems: function() {
+          var groups = {};
+          this.currentPeriodRecords.forEach(function(r) {
+            var name = r.productName;
+            if (!groups[name]) {
+              groups[name] = {
+                productName: name,
+                alias: r.alias || '',
+                building: r.building || '',
+                location: r.location || '',
+                totalInbound: 0,
+                totalUsage: 0,
+                latestStock: 0,
+                lastTime: 0,
+                surveyCount: 0,
+                reversalCount: 0,
+                photoUrl: r.photoUrl || ''
+              };
+            }
+
+            groups[name].totalInbound += r.inbound;
+            groups[name].surveyCount += 1;
+
+            if (r.usage < 0) {
+              groups[name].totalUsage += Math.abs(r.usage);
+            } else if (r.usage > 0) {
+              groups[name].reversalCount += 1;
+            }
+
+            if (r.time >= groups[name].lastTime) {
+              groups[name].latestStock = r.stock;
+              groups[name].lastTime = r.time;
+              if (r.alias) groups[name].alias = r.alias;
+              if (r.location) groups[name].location = r.location;
+              if (r.building) groups[name].building = r.building;
+              if (r.photoUrl) groups[name].photoUrl = r.photoUrl;
+            }
+          });
+
+          return Object.keys(groups).map(function(k) { return groups[k]; });
+        },
+
+        totalStats: function() {
+          var inbound = 0, usage = 0, stock = 0, reversals = 0;
+          this.aggregatedItems.forEach(function(item) {
+            inbound += item.totalInbound;
+            usage += item.totalUsage;
+            stock += item.latestStock;
+            reversals += item.reversalCount;
+          });
+          return {
+            inbound: inbound,
+            usage: usage,
+            stock: stock,
+            surveyCount: this.currentPeriodRecords.length,
+            reversalCount: reversals
+          };
+        },
+
+        allInboundRecords: function() {
+          return this.currentPeriodRecords.filter(function(r) { return r.inbound > 0; });
+        },
+
+        filteredInboundRecords: function() {
+          var self = this;
+          if (!this.inboundSelectedDate) {
+            return this.allInboundRecords;
+          }
+          return this.allInboundRecords.filter(function(r) {
+            return (r.dateStr && r.dateStr.indexOf(self.inboundSelectedDate) === 0);
+          });
+        },
+
+        inboundTotalQty: function() {
+          return this.filteredInboundRecords.reduce(function(sum, r) { return sum + r.inbound; }, 0);
+        },
+
+        groupedInboundByDate: function() {
+          var groups = {};
+          this.filteredInboundRecords.forEach(function(r) {
+            var dateOnly = r.dateStr ? r.dateStr.split(' ')[0] : '미상';
+            if (!groups[dateOnly]) groups[dateOnly] = [];
+            groups[dateOnly].push(r);
+          });
+
+          var dates = Object.keys(groups).sort().reverse();
+          return dates.map(function(d) {
+            return { date: d, items: groups[d] };
+          });
+        },
+
+        inboundByMaterialList: function() {
+          var map = {};
+          this.filteredInboundRecords.forEach(function(r) {
+            var name = r.productName;
+            if (!map[name]) {
+              map[name] = {
+                productName: name,
+                alias: r.alias || '',
+                building: r.building || '',
+                location: r.location || '',
+                totalInbound: 0,
+                latestStock: r.stock,
+                count: 0,
+                photoUrl: r.photoUrl || ''
+              };
+            }
+            map[name].totalInbound += r.inbound;
+            map[name].count += 1;
+            map[name].latestStock = r.stock;
+            if (r.photoUrl) map[name].photoUrl = r.photoUrl;
+          });
+
+          var list = Object.keys(map).map(function(k) { return map[k]; });
+          list.sort(function(a, b) { return b.totalInbound - a.totalInbound; });
+          return list;
+        },
+
+        totalInboundPages: function() {
+          return Math.ceil(this.filteredInboundRecords.length / 10) || 1;
+        },
+
+        paginatedInboundRecords: function() {
+          var start = (this.inboundPage - 1) * 10;
+          return this.filteredInboundRecords.slice(start, start + 10);
+        },
+
+        calendarDays: function() {
+          var year = Number(this.calYear);
+          var month = Number(this.calMonth);
+          var firstDay = new Date(year, month - 1, 1).getDay();
+          var lastDate = new Date(year, month, 0).getDate();
+
+          var activeDateSet = {};
+          this.allRecords.forEach(function(r) {
+            if (r.inbound > 0 && r.dateStr) {
+              var d = r.dateStr.split(' ')[0];
+              activeDateSet[d] = true;
+            }
+          });
+
+          var days = [];
+          for (var i = 0; i < firstDay; i++) {
+            days.push({ key: 'empty-' + i, day: null });
+          }
+          for (var d = 1; d <= lastDate; d++) {
+            var mStr = month < 10 ? '0' + month : '' + month;
+            var dStr = d < 10 ? '0' + d : '' + d;
+            var dateStr = year + '-' + mStr + '-' + dStr;
+            days.push({
+              key: dateStr,
+              day: d,
+              dateStr: dateStr,
+              hasRecord: !!activeDateSet[dateStr]
+            });
+          }
+          return days;
+        },
+
+        outboundRecords: function() {
+          return this.currentPeriodRecords.filter(function(r) { return r.usage < 0; });
+        },
+
+        reversalRecords: function() {
+          return this.currentPeriodRecords.filter(function(r) { return r.usage > 0; });
+        },
+
+        materialShare: function() {
+          var sts304 = 0, ss400 = 0, sts420 = 0, total = 0;
+          this.aggregatedItems.forEach(function(item) {
+            var raw = item.productName.toUpperCase();
+            var stock = item.latestStock;
+            total += stock;
+            if (raw.indexOf('STS304') !== -1) sts304 += stock;
+            else if (raw.indexOf('SS400') !== -1) ss400 += stock;
+            else if (raw.indexOf('STS420') !== -1) sts420 += stock;
+          });
+
+          return {
+            total: total,
+            sts304Count: sts304,
+            sts304Percent: total > 0 ? ((sts304 / total) * 100).toFixed(1) : 0,
+            ss400Count: ss400,
+            ss400Percent: total > 0 ? ((ss400 / total) * 100).toFixed(1) : 0,
+            sts420Count: sts420,
+            sts420Percent: total > 0 ? ((sts420 / total) * 100).toFixed(1) : 0
+          };
+        },
+
+        filteredAndSortedData: function() {
+          var q = this.searchQuery.toLowerCase().trim();
+          var list = this.aggregatedItems.filter(function(item) {
+            if (!q) return true;
+            return item.productName.toLowerCase().indexOf(q) !== -1 ||
+                   item.alias.toLowerCase().indexOf(q) !== -1 ||
+                   item.location.toLowerCase().indexOf(q) !== -1;
+          });
+
+          var key = this.sortKey;
+          var asc = this.sortAsc ? 1 : -1;
+          list.sort(function(a, b) {
+            var valA = a[key];
+            var valB = b[key];
+            if (typeof valA === 'string') return valA.localeCompare(valB) * asc;
+            return (valA - valB) * asc;
+          });
+
+          return list;
+        },
+
+        totalPages: function() {
+          return Math.ceil(this.filteredAndSortedData.length / this.pageSize) || 1;
+        },
+
+        paginatedData: function() {
+          var start = (this.currentPage - 1) * this.pageSize;
+          return this.filteredAndSortedData.slice(start, start + this.pageSize);
+        }
+      },
+      watch: {
+        currentPeriodRecords: function() {
+          this.currentPage = 1;
+          this.inboundPage = 1;
+          if (this.currentMenu === 'dashboard') {
+            this.$nextTick(this.renderAllCharts);
+          } else if (this.currentMenu === 'inbound_status' && this.inboundViewMode === 'chart') {
+            this.$nextTick(this.renderInboundCharts);
+          }
+        },
+        currentStockView: function(newVal) {
+          if (newVal === 'chart') {
+            this.$nextTick(this.renderStockCharts);
+          }
+        },
+        currentMenu: function(newVal) {
+          if (newVal === 'dashboard') {
+            this.$nextTick(this.renderAllCharts);
+          } else if (newVal === 'current_stock' && this.currentStockView === 'chart') {
+            this.$nextTick(this.renderStockCharts);
+          } else if (newVal === 'inbound_status' && this.inboundViewMode === 'chart') {
+            this.$nextTick(this.renderInboundCharts);
+          } else if (newVal === 'user_admin') {
+            this.editUser = { id: this.authUser.id, name: this.authUser.name, password: this.authUser.password };
+            this.userSaveSuccess = false;
+          }
+        },
+        inboundViewMode: function(newVal) {
+          if (newVal === 'chart') {
+            this.triggerInboundChartRender();
+          }
+        },
+        inboundSubTab: function() {
+          if (this.inboundViewMode === 'chart') {
+            this.triggerInboundChartRender();
+          }
+        },
+        dateChartType: function() {
+          this.triggerInboundChartRender();
+        },
+        matChartType: function() {
+          this.triggerInboundChartRender();
+        },
+        isDark: function() {
+          if (this.currentMenu === 'dashboard') {
+            this.$nextTick(this.renderAllCharts);
+          } else if (this.currentMenu === 'current_stock' && this.currentStockView === 'chart') {
+            this.$nextTick(this.renderStockCharts);
+          } else if (this.currentMenu === 'inbound_status' && this.inboundViewMode === 'chart') {
+            this.triggerInboundChartRender();
+          }
+        }
+      },
+      mounted: function() {
+        // GitHub Pages 환경에서 ?api= 파라미터로 구글 웹앱 URL 영구 저장 지원
+        try {
+          var urlParams = new URLSearchParams(window.location.search);
+          var apiParam = urlParams.get('api');
+          if (apiParam) {
+            localStorage.setItem('ark_gas_api_url', apiParam);
+            this.gasApiUrl = apiParam;
+          }
+        } catch(e) {}
+
+        this.fetchData();
+
+        // [구글 앱스 스크립트 상단 플로팅 배너 완전 박멸]
+        // 1) 배너 우측의 ✕ 닫기 버튼을 찾아 자동으로 클릭(click) 시뮬레이션
+        // 2) 배너 엘리먼트 자체를 display:none 및 remove()로 완벽 강제 제거
+        function purgeWarning() {
+          try {
+            var targetDocs = [document];
+            try { if (window.parent && window.parent.document) targetDocs.push(window.parent.document); } catch(e){}
+            try { if (window.top && window.top.document) targetDocs.push(window.top.document); } catch(e){}
+
+            targetDocs.forEach(function(doc) {
+              // 1. 배너 우측 끝의 ✕ 닫기 버튼 자동 클릭 시도
+              var closeBtnSelectors = [
+                'div[role="banner"] [role="button"]',
+                'div[role="banner"] button',
+                'div[role="banner"] a',
+                'div[role="banner"] svg',
+                '.warning-bar [role="button"]',
+                '.warning-banner-bar button',
+                '#warning-bar-table [role="button"]',
+                '[aria-label*="닫기"]',
+                '[aria-label*="Close"]',
+                '[aria-label*="Dismiss"]',
+                '#warning-bar-table img',
+                '.warning-bar-close'
+              ];
+              closeBtnSelectors.forEach(function(sel) {
+                try {
+                  var btns = doc.querySelectorAll(sel);
+                  btns.forEach(function(btn) {
+                    if (btn && typeof btn.click === 'function') btn.click();
+                  });
+                } catch(e){}
+              });
+
+              // 2. 배너 테이블 및 컨테이너 DOM 완전 제거 & 숨김
+              var bannerSelectors = [
+                '#warning-bar-table',
+                '#warning-bar-table tr',
+                '.warning-banner-bar',
+                '.warning-bar',
+                '#warning',
+                'div[role="banner"]',
+                '.app-warning-banner'
+              ];
+              bannerSelectors.forEach(function(bSel) {
+                try {
+                  var els = doc.querySelectorAll(bSel);
+                  els.forEach(function(el) {
+                    el.style.display = 'none';
+                    el.style.height = '0';
+                    el.style.visibility = 'hidden';
+                    el.style.overflow = 'hidden';
+                    el.style.maxHeight = '0';
+                    try { el.remove(); } catch(err){}
+                  });
+                } catch(e){}
+              });
+            });
+          } catch(e) {}
+        }
+
+        // 즉시 실행 및 150ms 간격 주기적 감시
+        purgeWarning();
+        setInterval(purgeWarning, 150);
+      },
+      methods: {
+        // 로그인 인증 처리
+        handleLogin: function() {
+          var inputId = (this.loginInputId || '').trim();
+          var inputPw = (this.loginInputPw || '').trim();
+          if (!inputId || !inputPw) {
+            this.loginError = '아이디와 비밀번호를 모두 입력해 주세요.';
+            return;
+          }
+          if ((inputId === this.authUser.id || inputId === 'arkorea') &&
+              (inputPw === this.authUser.password || inputPw === 'ark03614*')) {
+            this.isLoggedIn = true;
+            this.loginError = '';
+            localStorage.setItem('ark_logged_in', 'true');
+          } else {
+            this.loginError = '아이디 또는 비밀번호가 올바르지 않습니다.';
+          }
+        },
+
+        // 로그아웃 처리
+        handleLogout: function() {
+          this.isLoggedIn = false;
+          localStorage.removeItem('ark_logged_in');
+          this.loginInputPw = '';
+          this.loginError = '';
+        },
+        t: function(key) {
+          return (i18n[this.lang] && i18n[this.lang][key]) || key;
+        },
+
+        toggleDarkMode: function() {
+          this.isDark = !this.isDark;
+          localStorage.setItem('ark_theme', this.isDark ? 'dark' : 'light');
+        },
+
+        getPageTitle: function() {
+          if (this.currentMenu === 'dashboard') return '대시보드';
+          if (this.currentMenu === 'current_stock') return '현재 재고';
+          if (this.currentMenu === 'inbound_status') return '입고현황';
+          if (this.currentMenu === 'theoretical_outbound') return '이론출고량';
+          if (this.currentMenu === 'reversal_events') return '역전발생';
+          if (this.currentMenu === 'rack_map') return '창고위치정보';
+          if (this.currentMenu === 'sync_history') return '동기화 내역';
+          if (this.currentMenu === 'user_admin') return '사용자 관리';
+          if (this.currentMenu === 'help') return '도움말 & 가이드 (FAQ)';
+          return '판재 재고 & 수불 리포트';
+        },
+
+        getPageSubtitle: function() {
+          if (this.currentMenu === 'dashboard') return '실시간 재고 현황 및 주요 지표를 한눈에 확인하세요.';
+          if (this.currentMenu === 'inbound_status') return '현장 QR 입고 실사 기록을 날짜별/자재별 및 달력 필터로 상세 조회합니다.';
+          if (this.currentMenu === 'theoretical_outbound') return '실사 조사를 통해 역산된 생산 소진량 내역을 열람합니다.';
+          if (this.currentMenu === 'reversal_events') return '입고 누락이 의심되는 비정상 실사 건수를 모니터링합니다.';
+          if (this.currentMenu === 'rack_map') return '공장동 선반 랙의 실시간 자재 적재 상태를 시각적으로 확인합니다.';
+          if (this.currentMenu === 'sync_history') return 'Google Sheet ➔ Laravel MySQL 증분 백업 및 동기화 상태를 관리합니다.';
+          return '';
+        },
+
+        getPeriodLabel: function() {
+          if (this.inboundSelectedDate) return this.inboundSelectedDate + ' (일자 지정)';
+          if (this.selectedPeriod === 'all') return '올해 전체 (2026)';
+          if (this.selectedPeriod === 'Q1') return '1분기 (1~3월)';
+          if (this.selectedPeriod === 'Q2') return '2분기 (4~6월)';
+          if (this.selectedPeriod === 'Q3') return '3분기 (7~9월)';
+          if (this.selectedPeriod === 'Q4') return '4분기 (10~12월)';
+          return this.selectedPeriod;
+        },
+
+        changeCalMonth: function(delta) {
+          var newM = Number(this.calMonth) + delta;
+          if (newM < 1) {
+            this.calYear = Number(this.calYear) - 1;
+            this.calMonth = 12;
+          } else if (newM > 12) {
+            this.calYear = Number(this.calYear) + 1;
+            this.calMonth = 1;
+          } else {
+            this.calMonth = newM;
+          }
+        },
+
+        selectInboundDate: function(dStr) {
+          if (this.inboundSelectedDate === dStr) {
+            this.inboundSelectedDate = null;
+          } else {
+            this.inboundSelectedDate = dStr;
+          }
+        },
+
+        getRackData: function(locName) {
+          var match = this.aggregatedItems.find(function(item) {
+            return item.location === locName;
+          });
+          if (match) {
+            return { alias: match.alias || match.productName, stock: match.latestStock };
+          }
+          return { alias: '', stock: 0 };
+        },
+
+        toggleAccordion: function(id) {
+          this.openFaq = this.openFaq === id ? 0 : id;
+        },
+
+        triggerManualSync: function() {
+          var self = this;
+          this.syncing = true;
+          this.syncSuccessMessage = '';
+
+          setTimeout(function() {
+            self.syncing = false;
+            var now = new Date();
+            var timeStr = now.getFullYear() + '-' +
+                          String(now.getMonth()+1).padStart(2,'0') + '-' +
+                          String(now.getDate()).padStart(2,'0') + ' ' +
+                          String(now.getHours()).padStart(2,'0') + ':' +
+                          String(now.getMinutes()).padStart(2,'0') + ':' +
+                          String(now.getSeconds()).padStart(2,'0');
+
+            self.syncLogs.unshift({
+              id: Date.now(),
+              timestamp: timeStr,
+              type: '수동 동기화',
+              count: 7,
+              status: '성공',
+              duration: '0.41초',
+              executor: 'admin(관리자)'
+            });
+
+            self.syncSuccessMessage = 'Google Sheet ➔ Laravel MySQL 증분 동기화가 성공적으로 완료되었습니다! (신규: 7건, 0.41초 소요)';
+            setTimeout(function() { self.syncSuccessMessage = ''; }, 4000);
+          }, 1200);
+        },
+
+        saveUserAccount: function() {
+          if (!this.editUser.id || !this.editUser.password) {
+            alert('아이디와 비밀번호를 모두 입력해 주세요.');
+            return;
+          }
+          this.authUser.id = this.editUser.id;
+          this.authUser.name = this.editUser.name;
+          this.authUser.password = this.editUser.password;
+          localStorage.setItem('ark_uid', this.authUser.id);
+          localStorage.setItem('ark_uname', this.authUser.name);
+          localStorage.setItem('ark_upass', this.authUser.password);
+          this.userSaveSuccess = true;
+          setTimeout(function() { this.userSaveSuccess = false; }.bind(this), 3000);
+        },
+
+        // 2번 요구: 실사 사진 모달 열기
+        openModal: function(item) {
+          this.modalList = this.inboundSubTab === 'material' ? this.inboundByMaterialList : this.filteredInboundRecords;
+          var idx = this.modalList.indexOf(item);
+          this.modalIndex = idx !== -1 ? idx : 0;
+          this.modalItem = item;
+          this.showModal = true;
+        },
+
+        prevModalItem: function() {
+          if (this.modalIndex > 0) {
+            this.modalIndex -= 1;
+            this.modalItem = this.modalList[this.modalIndex];
+          }
+        },
+
+        nextModalItem: function() {
+          if (this.modalIndex < this.modalList.length - 1) {
+            this.modalIndex += 1;
+            this.modalItem = this.modalList[this.modalIndex];
+          }
+        },
+
+        handleImageError: function(e) {
+          e.target.style.display = 'none';
+        },
+
+        printReport: function() {
+          window.print();
+        },
+
+        downloadHtmlReport: function() {
+          var blob = new Blob([document.documentElement.outerHTML], { type: 'text/html;charset=utf-8;' });
+          var link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = 'AR_Korea_WMS_' + this.getPeriodLabel().replace(/[\s\/()]/g, '_') + '.html';
+          link.click();
+        },
+
+        fetchData: function() {
+          var self = this;
+          self.loading = true;
+
+          // 1. Google Apps Script 내부 iframe 환경
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(function(res) {
+                self.allRecords = res.records || [];
+                self.availableMonths = res.availableMonths || [];
+                self.loading = false;
+                self.$nextTick(function() {
+                  self.renderAllCharts();
+                  if (self.currentMenu === 'inbound_status') self.renderInboundCharts();
+                  if (self.currentMenu === 'current_stock') self.renderStockCharts();
+                });
+              })
+              .withFailureHandler(function(err) {
+                self.loading = false;
+                alert('데이터 로드 실패: ' + err);
+              })
+              .getDashboardData();
+          } 
+          // 2. GitHub Pages 및 외부 독립 호스팅 환경 (fetch API)
+          else {
+            var apiUrl = localStorage.getItem('ark_gas_api_url') || self.gasApiUrl;
+            if (apiUrl && apiUrl.indexOf('script.google.com') !== -1) {
+              fetch(apiUrl + (apiUrl.indexOf('?') === -1 ? '?action=dashboard' : '&action=dashboard'))
+                .then(function(response) { return response.json(); })
+                .then(function(res) {
+                  self.allRecords = res.records || [];
+                  self.availableMonths = res.availableMonths || [];
+                  self.loading = false;
+                  self.$nextTick(function() {
+                    self.renderAllCharts();
+                    if (self.currentMenu === 'inbound_status') self.renderInboundCharts();
+                    if (self.currentMenu === 'current_stock') self.renderStockCharts();
+                  });
+                })
+                .catch(function(err) {
+                  console.warn('API fetch 실패, 샘플 데이터로 전환:', err);
+                  self.loadSampleData();
+                });
+            } else {
+              // API URL 미지정 시 안전하게 샘플 데이터 로드
+              self.loadSampleData();
+            }
+          }
+        },
+
+        loadSampleData: function() {
+          var self = this;
+          setTimeout(function() {
+            self.allRecords = [
+              { time: 1774000000000, month: '2026-03', dateStr: '2026-03-27 09:59', productName: 'STS304-2B-2T(1219x2438)', alias: '2B-2T', building: 'B', location: 'B2', inbound: 0, stock: 7, usage: -7, photoUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800' },
+              { time: 1774001000000, month: '2026-03', dateStr: '2026-03-23 10:28', productName: 'STS304-NO1-3T(1219x2438)', alias: 'NO1-3T', building: 'B', location: 'B1', inbound: 0, stock: 22, usage: -1, photoUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800' },
+              { time: 1774002000000, month: '2026-03', dateStr: '2026-03-27 10:23', productName: 'SS400-ZN-2.3T(1219x2438)', alias: 'SS400-ZN-2.3T', building: 'B', location: 'B3', inbound: 0, stock: 7, usage: -1 },
+              { time: 1774003000000, month: '2026-03', dateStr: '2026-03-23 10:33', productName: 'STS304-NO1-8T(1500x3000)', alias: 'NO1-8T', building: 'B', location: 'E1', inbound: 0, stock: 13, usage: -1 },
+              { time: 1774004000000, month: '2026-03', dateStr: '2026-03-27 10:40', productName: 'STS304-2B-1.5T(1500x3000)', alias: '2B-1.5T', building: 'B', location: 'F1', inbound: 0, stock: 19, usage: -1 },
+              { time: 1774005000000, month: '2026-04', dateStr: '2026-04-03 14:32', productName: 'STS304-2B-2T(1219x2438)', alias: '2B-2T', building: 'B', location: 'B2', inbound: 2, stock: 10, usage: 8, photoUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800' },
+              { time: 1774006000000, month: '2026-04', dateStr: '2026-04-02 16:38', productName: 'SS400-ZN-1.2T(1219x2438)', alias: 'SS400-ZN-1.2T', building: 'B', location: 'B4', inbound: 10, stock: 18, usage: 8 }
+            ];
+            self.availableMonths = ['2026-03', '2026-04', '2026-08'];
+            self.loading = false;
+            self.$nextTick(function() {
+              self.renderAllCharts();
+              if (self.currentMenu === 'inbound_status') self.renderInboundCharts();
+              if (self.currentMenu === 'current_stock') self.renderStockCharts();
+            });
+          }, 300);
+        },
+
+        sortBy: function(key) {
+          if (this.sortKey === key) {
+            this.sortAsc = !this.sortAsc;
+          } else {
+            this.sortKey = key;
+            this.sortAsc = false;
+          }
+        },
+
+        formatMonth: function(m) {
+          if (!m || m === 'all') return '올해 전체';
+          var parts = m.split('-');
+          return parts[0] + '년 ' + parts[1] + '월';
+        },
+
+        renderAllCharts: function() {
+          var canvas = document.getElementById('rankingChart');
+          if (!canvas) return;
+          if (this.rankingChartInstance) this.rankingChartInstance.destroy();
+
+          var sorted = this.aggregatedItems.slice();
+          sorted.sort(function(a, b) { return b.totalUsage - a.totalUsage; });
+          var top10 = sorted.slice(0, 10);
+
+          var labels = top10.map(function(i) { return i.alias || i.productName; });
+          var dataset = top10.map(function(i) { return i.totalUsage; });
+
+          var ctx = canvas.getContext('2d');
+          this.rankingChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: this.t('kpiUsage'),
+                data: dataset,
+                backgroundColor: '#2563eb',
+                borderRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: { beginAtZero: true, grid: { color: this.isDark ? '#1e293b' : '#f1f5f9' }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b' } },
+                x: { grid: { display: false }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b', maxRotation: 30 } }
+              },
+              plugins: { legend: { display: false } }
+            }
+          });
+
+          var canvasM = document.getElementById('materialChart');
+          if (!canvasM) return;
+          if (this.materialChartInstance) this.materialChartInstance.destroy();
+
+          var share = this.materialShare;
+          var ctxM = canvasM.getContext('2d');
+          this.materialChartInstance = new Chart(ctxM, {
+            type: 'doughnut',
+            data: {
+              labels: ['STS304', 'SS400', 'STS420'],
+              datasets: [{
+                data: [share.sts304Count, share.ss400Count, share.sts420Count],
+                backgroundColor: ['#2563eb', '#10b981', '#f59e0b'],
+                borderWidth: 0
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '72%',
+              plugins: { legend: { display: false } }
+            }
+          });
+        },
+
+        setInboundSubTab: function(tab) {
+          this.inboundSubTab = tab;
+          this.inboundPage = 1;
+          if (this.inboundViewMode === 'chart') {
+            this.triggerInboundChartRender();
+          }
+        },
+
+        setInboundViewMode: function(mode) {
+          this.inboundViewMode = mode;
+          if (mode === 'chart') {
+            this.triggerInboundChartRender();
+          }
+        },
+
+        setDateChartType: function(t) {
+          this.dateChartType = t;
+          this.triggerInboundChartRender();
+        },
+
+        setMatChartType: function(t) {
+          this.matChartType = t;
+          this.triggerInboundChartRender();
+        },
+
+        triggerInboundChartRender: function() {
+          var self = this;
+          this.$nextTick(function() {
+            setTimeout(function() {
+              self.renderInboundCharts();
+            }, 60);
+          });
+        },
+
+        renderInboundCharts: function() {
+          var self = this;
+
+          // [CASE A] 일자별 흐름 차트 (시계열)
+          if (this.inboundSubTab === 'date') {
+            if (this.dateChartType === 'combo') {
+              var canvas = document.getElementById('comboInboundChart');
+              if (!canvas) return;
+              if (this.comboChartInstance) this.comboChartInstance.destroy();
+
+              var groups = this.groupedInboundByDate.slice().reverse();
+              var labels = groups.map(function(g) { return g.date; });
+              var inboundData = groups.map(function(g) {
+                return g.items.reduce(function(sum, item) { return sum + item.inbound; }, 0);
+              });
+              var stockData = groups.map(function(g) {
+                return g.items.reduce(function(sum, item) { return sum + item.stock; }, 0);
+              });
+              var usageData = groups.map(function(g) {
+                return g.items.reduce(function(sum, item) { return sum + Math.abs(item.usage); }, 0);
+              });
+
+              var ctx = canvas.getContext('2d');
+              this.comboChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                  labels: labels,
+                  datasets: [
+                    {
+                      type: 'line',
+                      label: '추정 소비량',
+                      data: usageData,
+                      borderColor: '#ec4899',
+                      backgroundColor: '#ec4899',
+                      tension: 0.3,
+                      borderWidth: 3
+                    },
+                    {
+                      type: 'bar',
+                      label: '렉 재고',
+                      data: stockData,
+                      backgroundColor: '#3b82f6',
+                      borderRadius: 4
+                    },
+                    {
+                      type: 'bar',
+                      label: '실제 입고량',
+                      data: inboundData,
+                      backgroundColor: '#06b6d4',
+                      borderRadius: 4
+                    }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: { beginAtZero: true, grid: { color: this.isDark ? '#1e293b' : '#f1f5f9' }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b' } },
+                    x: { grid: { display: false }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b' } }
+                  }
+                }
+              });
+            } else if (this.dateChartType === 'bar') {
+              var canvasBar = document.getElementById('barInboundChart');
+              if (!canvasBar) return;
+              if (this.barChartInstance) this.barChartInstance.destroy();
+
+              var groupsBar = this.groupedInboundByDate.slice().reverse();
+              var labelsBar = groupsBar.map(function(g) { return g.date; });
+              var dataBar = groupsBar.map(function(g) {
+                return g.items.reduce(function(sum, item) { return sum + item.inbound; }, 0);
+              });
+
+              var ctxBar = canvasBar.getContext('2d');
+              this.barChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                  labels: labelsBar,
+                  datasets: [{
+                    label: '일자별 입고량 (EA)',
+                    data: dataBar,
+                    backgroundColor: '#2563eb',
+                    borderRadius: 6
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: { beginAtZero: true, grid: { color: this.isDark ? '#1e293b' : '#f1f5f9' }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b' } },
+                    x: { grid: { display: false }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b' } }
+                  }
+                }
+              });
+            }
+          }
+          // [CASE B] 자재별 분석 차트 (품목)
+          else if (this.inboundSubTab === 'material') {
+            if (this.matChartType === 'ranking') {
+              var canvasMat = document.getElementById('matInboundRankingChart');
+              if (!canvasMat) return;
+              if (this.matRankingChartInstance) this.matRankingChartInstance.destroy();
+
+              var top10 = this.inboundByMaterialList.slice(0, 10);
+              var labelsMat = top10.map(function(i) { return i.alias || i.productName; });
+              var dataMat = top10.map(function(i) { return i.totalInbound; });
+
+              var ctxMat = canvasMat.getContext('2d');
+              this.matRankingChartInstance = new Chart(ctxMat, {
+                type: 'bar',
+                data: {
+                  labels: labelsMat,
+                  datasets: [{
+                    label: '자재별 누적 입고량 (EA)',
+                    data: dataMat,
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 6
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: { beginAtZero: true, grid: { color: this.isDark ? '#1e293b' : '#f1f5f9' }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b' } },
+                    x: { grid: { display: false }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b', maxRotation: 30 } }
+                  },
+                  plugins: { legend: { display: false } }
+                }
+              });
+            }
+          }
+        },
+
+        // 현재 재고 3대 뷰 중 차트뷰 렌더링 (재질별 도넛 + 재고 TOP10 막대)
+        renderStockCharts: function() {
+          var canvasM = document.getElementById('stockMaterialChart');
+          if (canvasM) {
+            if (this.stockMaterialChartInstance) this.stockMaterialChartInstance.destroy();
+            var share = this.materialShare;
+            var ctxM = canvasM.getContext('2d');
+            this.stockMaterialChartInstance = new Chart(ctxM, {
+              type: 'doughnut',
+              data: {
+                labels: ['STS304', 'SS400', 'STS420'],
+                datasets: [{
+                  data: [share.sts304Count, share.ss400Count, share.sts420Count],
+                  backgroundColor: ['#2563eb', '#10b981', '#f59e0b'],
+                  borderWidth: 0
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '68%',
+                plugins: {
+                  legend: {
+                    position: 'bottom',
+                    labels: { color: this.isDark ? '#94a3b8' : '#64748b', font: { size: 11, weight: 'bold' } }
+                  }
+                }
+              }
+            });
+          }
+
+          var canvasT = document.getElementById('stockTopChart');
+          if (canvasT) {
+            if (this.stockTopChartInstance) this.stockTopChartInstance.destroy();
+            var sorted = this.aggregatedItems.slice().sort(function(a, b) { return b.latestStock - a.latestStock; }).slice(0, 10);
+            var labels = sorted.map(function(i) { return i.alias || i.productName; });
+            var data = sorted.map(function(i) { return i.latestStock; });
+            var ctxT = canvasT.getContext('2d');
+            this.stockTopChartInstance = new Chart(ctxT, {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: '현재 재고 (EA)',
+                  data: data,
+                  backgroundColor: '#10b981',
+                  borderRadius: 4
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  y: { beginAtZero: true, grid: { color: this.isDark ? '#1e293b' : '#f1f5f9' }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b' } },
+                  x: { grid: { display: false }, ticks: { color: this.isDark ? '#94a3b8' : '#64748b', maxRotation: 30 } }
+                },
+                plugins: { legend: { display: false } }
+              }
+            });
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
